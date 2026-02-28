@@ -20,5 +20,6 @@ export interface Memory {
 }
 
 export interface MemoryWithScore extends Memory {
+  /** Weighted composite score: 0.6×similarity + 0.25×importance + 0.15×recency. Higher is better. Range: [0, ~1]. */
   score: number;
 }

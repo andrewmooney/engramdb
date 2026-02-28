@@ -9,6 +9,7 @@ describe('createDb', () => {
     ).all() as { name: string }[];
     const names = tables.map(t => t.name);
     expect(names).toContain('memories');
+    expect(names).toContain('memory_embeddings');
     db.close();
   });
 });
