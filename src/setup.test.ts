@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { mkdtemp, rm, mkdir } from 'node:fs/promises'
+import { mkdtemp, rm, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { runSetup } from './setup.js'
+import { runSetup, appendAgentsMd } from './setup.js'
 
 describe('runSetup', () => {
   it('runs without error when no clients are detected', async () => {
@@ -74,5 +74,46 @@ it('detects VS Code when ~/.vscode/ exists', async () => {
   } finally {
     await rm(home, { recursive: true, force: true })
     await rm(cwd, { recursive: true, force: true })
+  }
+})
+
+it('appendAgentsMd creates file when absent', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'mtmem-agents-test-'))
+  try {
+    const filePath = join(dir, 'AGENTS.md')
+    await appendAgentsMd(filePath)
+    const content = await readFile(filePath, 'utf8')
+    expect(content).toContain('## Memory (mtmem)')
+    expect(content).toContain('remember_memory')
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+it('appendAgentsMd appends to existing file', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'mtmem-agents-test-'))
+  try {
+    const filePath = join(dir, 'AGENTS.md')
+    await writeFile(filePath, '# Existing content\n\nSome rules here.\n')
+    await appendAgentsMd(filePath)
+    const content = await readFile(filePath, 'utf8')
+    expect(content).toContain('# Existing content')
+    expect(content).toContain('## Memory (mtmem)')
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+it('appendAgentsMd does not duplicate when sentinel present', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'mtmem-agents-test-'))
+  try {
+    const filePath = join(dir, 'AGENTS.md')
+    await appendAgentsMd(filePath)
+    await appendAgentsMd(filePath) // second call
+    const content = await readFile(filePath, 'utf8')
+    const count = (content.match(/## Memory \(mtmem\)/g) ?? []).length
+    expect(count).toBe(1)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
   }
 })
