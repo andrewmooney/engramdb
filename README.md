@@ -52,6 +52,28 @@ You should see:
 
 ---
 
+## Setup
+
+Run `mtmem setup` to automatically configure your AI client(s). Setup detects which clients are installed and writes the appropriate agent instruction files.
+
+```bash
+mtmem setup
+```
+
+**What it does per client:**
+
+| Client | Action |
+|---|---|
+| OpenCode | Installs the session lifecycle plugin + writes `~/.config/opencode/AGENTS.md` |
+| Claude Code | Appends memory instructions to `~/.claude/CLAUDE.md` |
+| Cursor | Writes `~/.cursor/rules/mtmem.md` |
+| VS Code Copilot | Writes `.github/copilot-instructions.md` in the current directory |
+| Claude Desktop | Detected but not configured — no global instruction file path |
+
+Setup is idempotent — safe to re-run after upgrading mtmem (the OpenCode plugin is always updated; instruction files are never duplicated).
+
+---
+
 ## Client configuration
 
 ### OpenCode
