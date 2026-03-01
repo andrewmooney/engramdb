@@ -23,8 +23,13 @@ export function createServer(db: Database.Database): McpServer {
       importance: z.number().min(0).max(1).optional(),
     },
     async ({ project_id, agent_id, type, content, importance }) => {
-      const result = await handleRemember(db, { project_id, agent_id, type, content, importance });
-      return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+      try {
+        const result = await handleRemember(db, { project_id, agent_id, type, content, importance });
+        return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { content: [{ type: 'text', text: msg }], isError: true };
+      }
     }
   );
 
@@ -39,8 +44,13 @@ export function createServer(db: Database.Database): McpServer {
       agent_id: z.string().optional(),
     },
     async (input) => {
-      const results = await handleRecall(db, input);
-      return { content: [{ type: 'text', text: JSON.stringify(results) }] };
+      try {
+        const results = await handleRecall(db, input);
+        return { content: [{ type: 'text', text: JSON.stringify(results) }] };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { content: [{ type: 'text', text: msg }], isError: true };
+      }
     }
   );
 
@@ -52,8 +62,13 @@ export function createServer(db: Database.Database): McpServer {
       limit: z.number().int().min(1).max(50).optional(),
     },
     async (input) => {
-      const results = await handleSearchGlobal(db, input);
-      return { content: [{ type: 'text', text: JSON.stringify(results) }] };
+      try {
+        const results = await handleSearchGlobal(db, input);
+        return { content: [{ type: 'text', text: JSON.stringify(results) }] };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { content: [{ type: 'text', text: msg }], isError: true };
+      }
     }
   );
 
@@ -67,8 +82,16 @@ export function createServer(db: Database.Database): McpServer {
       type: z.enum(MEMORY_TYPES).optional(),
     },
     async (input) => {
-      const result = await handleUpdate(db, input);
-      return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+      try {
+        if (input.content === undefined && input.importance === undefined && input.type === undefined) {
+          throw new Error('At least one of content, importance, or type must be provided');
+        }
+        const result = await handleUpdate(db, input);
+        return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { content: [{ type: 'text', text: msg }], isError: true };
+      }
     }
   );
 
@@ -77,8 +100,13 @@ export function createServer(db: Database.Database): McpServer {
     'List all projects with memory counts',
     {},
     () => {
-      const result = handleListProjects(db);
-      return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+      try {
+        const result = handleListProjects(db);
+        return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { content: [{ type: 'text', text: msg }], isError: true };
+      }
     }
   );
 

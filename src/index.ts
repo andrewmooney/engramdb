@@ -20,12 +20,20 @@ if (useHttp) {
 
   const transports: Record<string, SSEServerTransport> = {};
 
+  // Note: SSEServerTransport is deprecated in SDK v1.27+. Future: migrate to StreamableHTTPServerTransport
+  // for better reconnection and streaming support.
   app.get('/mcp', async (req: Request, res: Response) => {
     const transport = new SSEServerTransport(
       '/mcp/message',
       res as unknown as ServerResponse
     );
     transports[transport.sessionId] = transport;
+
+    // Clean up on disconnect to prevent memory leak
+    res.on('close', () => {
+      delete transports[transport.sessionId];
+    });
+
     await mcpServer.connect(transport);
   });
 
@@ -44,6 +52,9 @@ if (useHttp) {
 
   app.listen(port, () => {
     process.stderr.write(`[mtmem] HTTP/SSE MCP server listening on http://localhost:${port}/mcp\n`);
+  }).on('error', (err: Error) => {
+    process.stderr.write(`[mtmem] Failed to start HTTP server: ${err.message}\n`);
+    process.exit(1);
   });
 } else {
   const transport = new StdioServerTransport();
