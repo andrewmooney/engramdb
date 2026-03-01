@@ -28,7 +28,8 @@
     "better-sqlite3": "^12.6.2",
     "express": "^5.2.1",
     "sqlite-vec": "^0.1.7-alpha.2",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
