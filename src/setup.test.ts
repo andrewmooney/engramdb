@@ -104,6 +104,69 @@ it('appendAgentsMd appends to existing file', async () => {
   }
 })
 
+it('OpenCode: writes plugin, updates package.json, writes AGENTS.md', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'mtmem-setup-test-'))
+  const cwd = await mkdtemp(join(tmpdir(), 'mtmem-setup-cwd-'))
+  const lines: string[] = []
+  try {
+    await mkdir(join(home, '.config', 'opencode'), { recursive: true })
+    await runSetup({ homeDir: home, cwd, log: (l) => lines.push(l) })
+
+    // Plugin written
+    const plugin = await readFile(join(home, '.config', 'opencode', 'plugins', 'mtmem.ts'), 'utf8')
+    expect(plugin).toContain('MtmemPlugin')
+
+    // package.json has dependency
+    const pkg = JSON.parse(await readFile(join(home, '.config', 'opencode', 'package.json'), 'utf8'))
+    expect(pkg.dependencies?.['@opencode-ai/plugin']).toBeTruthy()
+
+    // AGENTS.md written
+    const agents = await readFile(join(home, '.config', 'opencode', 'AGENTS.md'), 'utf8')
+    expect(agents).toContain('## Memory (mtmem)')
+
+    // Output line
+    expect(lines.some((l) => l.includes('OpenCode') && l.includes('✓'))).toBe(true)
+  } finally {
+    await rm(home, { recursive: true, force: true })
+    await rm(cwd, { recursive: true, force: true })
+  }
+})
+
+it('OpenCode: merges into existing package.json without clobbering', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'mtmem-setup-test-'))
+  const cwd = await mkdtemp(join(tmpdir(), 'mtmem-setup-cwd-'))
+  try {
+    await mkdir(join(home, '.config', 'opencode'), { recursive: true })
+    await writeFile(
+      join(home, '.config', 'opencode', 'package.json'),
+      JSON.stringify({ dependencies: { 'some-other-package': '1.0.0' } })
+    )
+    await runSetup({ homeDir: home, cwd, log: () => {} })
+    const pkg = JSON.parse(await readFile(join(home, '.config', 'opencode', 'package.json'), 'utf8'))
+    expect(pkg.dependencies?.['some-other-package']).toBe('1.0.0')
+    expect(pkg.dependencies?.['@opencode-ai/plugin']).toBeTruthy()
+  } finally {
+    await rm(home, { recursive: true, force: true })
+    await rm(cwd, { recursive: true, force: true })
+  }
+})
+
+it('OpenCode: overwrites plugin file on re-run', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'mtmem-setup-test-'))
+  const cwd = await mkdtemp(join(tmpdir(), 'mtmem-setup-cwd-'))
+  try {
+    await mkdir(join(home, '.config', 'opencode', 'plugins'), { recursive: true })
+    await writeFile(join(home, '.config', 'opencode', 'plugins', 'mtmem.ts'), '// old plugin')
+    await runSetup({ homeDir: home, cwd, log: () => {} })
+    const plugin = await readFile(join(home, '.config', 'opencode', 'plugins', 'mtmem.ts'), 'utf8')
+    expect(plugin).not.toContain('// old plugin')
+    expect(plugin).toContain('MtmemPlugin')
+  } finally {
+    await rm(home, { recursive: true, force: true })
+    await rm(cwd, { recursive: true, force: true })
+  }
+})
+
 it('appendAgentsMd does not duplicate when sentinel present', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'mtmem-agents-test-'))
   try {

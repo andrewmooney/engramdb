@@ -1,6 +1,6 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { access, readFile, writeFile } from 'node:fs/promises'
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
 
 export interface SetupOptions {
   homeDir?: string
@@ -11,10 +11,131 @@ export interface SetupOptions {
 interface ClientDescriptor {
   label: string
   detectionPath: (home: string) => string
+  setup?: (home: string, cwd: string, log: (l: string) => void) => Promise<void>
+}
+
+const OPENCODE_PLUGIN_SOURCE = `import type { Plugin } from "@opencode-ai/plugin"
+import { $ } from "bun"
+import path from "path"
+
+const conversationMap = new Map<string, string>()
+const lastAppendedMap = new Map<string, string>()
+let rpcId = 0
+
+async function callMtmem(toolName: string, args: Record<string, unknown>): Promise<unknown> {
+  const request = {
+    jsonrpc: "2.0",
+    id: ++rpcId,
+    method: "tools/call",
+    params: { name: toolName, arguments: args },
+  }
+  const json = JSON.stringify(request)
+  const result = await $\`mtmem\`.stdin(json).json()
+  return result
+}
+
+export const MtmemPlugin: Plugin = async ({ client, directory }) => {
+  const projectId = path.basename(directory)
+  const agentId = "opencode"
+
+  return {
+    event: async ({ event }) => {
+      try {
+        if (event.type === "session.created") {
+          const sessionId = (event.properties as { info?: { id?: string } })?.info?.id
+          if (!sessionId) return
+          const title = \`OpenCode session \${new Date().toISOString()}\`
+          const convResult = await callMtmem("start_conversation", {
+            project_id: projectId, agent_id: agentId, title,
+          }) as { result?: { content?: Array<{ text?: string }> } }
+          const text = convResult?.result?.content?.[0]?.text ?? "{}"
+          const parsed = JSON.parse(text) as { id?: string }
+          if (parsed.id) conversationMap.set(sessionId, parsed.id)
+          await callMtmem("recall_memories", { project_id: projectId, query: "recent work, decisions, patterns", limit: 10 })
+          await callMtmem("search_conversations", { project_id: projectId, query: "recent sessions", limit: 3 })
+          await client.app.log({ body: { service: "mtmem-plugin", level: "info", message: "session.created: conversation opened", extra: { sessionId, conversationId: parsed.id } } })
+        } else if (event.type === "session.idle") {
+          const sessionID = (event.properties as { sessionID?: string }).sessionID
+          if (!sessionID) return
+          const conversationId = conversationMap.get(sessionID)
+          if (!conversationId) return
+          try {
+            const messages = await client.session.messages({ path: { id: sessionID } })
+            const all = messages.data ?? []
+            const lastAssistant = [...all].reverse().find((m) => m.info?.role === "assistant")
+            if (!lastAssistant) return
+            const msgId = lastAssistant.info?.id
+            if (msgId && lastAppendedMap.get(sessionID) === msgId) return
+            const content = (lastAssistant.parts ?? []).filter((p) => p.type === "text").map((p) => (p as { text?: string }).text ?? "").join("\\n").trim()
+            if (!content) return
+            await callMtmem("append_turn", { conversation_id: conversationId, role: "assistant", content })
+            if (msgId) lastAppendedMap.set(sessionID, msgId)
+            await client.app.log({ body: { service: "mtmem-plugin", level: "debug", message: "session.idle: turn appended", extra: { sessionID, msgId } } })
+          } catch (err) {
+            await client.app.log({ body: { service: "mtmem-plugin", level: "warn", message: "session.idle: append_turn failed", extra: { error: String(err), sessionID } } })
+          }
+        } else if (event.type === "session.deleted") {
+          const sessionId = (event.properties as { info?: { id?: string } })?.info?.id
+          if (!sessionId) return
+          const conversationId = conversationMap.get(sessionId)
+          if (!conversationId) return
+          try {
+            const messages = await client.session.messages({ path: { id: sessionId } })
+            const all = messages.data ?? []
+            const summary = all.slice(-6).map((m) => {
+              const role = m.info?.role ?? "unknown"
+              const text = (m.parts ?? []).filter((p) => p.type === "text").map((p) => (p as { text?: string }).text ?? "").join(" ").slice(0, 200)
+              return \`\${role}: \${text}\`
+            }).join("\\n")
+            await callMtmem("close_conversation", { conversation_id: conversationId, summary: summary || "Session ended." })
+            conversationMap.delete(sessionId)
+            lastAppendedMap.delete(sessionId)
+            await client.app.log({ body: { service: "mtmem-plugin", level: "info", message: "session.deleted: conversation closed", extra: { sessionId, conversationId } } })
+          } catch (err) {
+            await client.app.log({ body: { service: "mtmem-plugin", level: "warn", message: "session.deleted: close_conversation failed", extra: { error: String(err), sessionId } } })
+            conversationMap.delete(sessionId)
+            lastAppendedMap.delete(sessionId)
+          }
+        } else if (event.type.startsWith("session.")) {
+          await client.app.log({ body: { service: "mtmem-plugin", level: "debug", message: \`event: \${event.type}\`, extra: event.properties } })
+        }
+      } catch (err) {
+        try {
+          await client.app.log({ body: { service: "mtmem-plugin", level: "warn", message: "mtmem-plugin event handler error", extra: { event: event.type, error: String(err) } } })
+        } catch { /* never throw */ }
+      }
+    },
+  }
+}
+`
+
+async function setupOpenCode(home: string, log: (l: string) => void): Promise<void> {
+  const baseDir = join(home, '.config', 'opencode')
+  const pluginsDir = join(baseDir, 'plugins')
+
+  // 1. Write plugin
+  await mkdir(pluginsDir, { recursive: true })
+  await writeFile(join(pluginsDir, 'mtmem.ts'), OPENCODE_PLUGIN_SOURCE)
+
+  // 2. Patch package.json
+  const pkgPath = join(baseDir, 'package.json')
+  let pkg: Record<string, unknown> = {}
+  try {
+    pkg = JSON.parse(await readFile(pkgPath, 'utf8'))
+  } catch { /* create fresh */ }
+  const deps = (pkg['dependencies'] as Record<string, string> | undefined) ?? {}
+  deps['@opencode-ai/plugin'] = 'latest'
+  pkg['dependencies'] = deps
+  await writeFile(pkgPath, JSON.stringify(pkg, null, 2) + '\n')
+
+  // 3. Append AGENTS.md
+  await appendAgentsMd(join(baseDir, 'AGENTS.md'))
+
+  log('  ✓ OpenCode        plugin installed, AGENTS.md updated')
 }
 
 const CLIENTS: ClientDescriptor[] = [
-  { label: 'OpenCode',        detectionPath: (h) => join(h, '.config', 'opencode') },
+  { label: 'OpenCode',        detectionPath: (h) => join(h, '.config', 'opencode'), setup: (h, _c, l) => setupOpenCode(h, l) },
   { label: 'Claude Code',     detectionPath: (h) => join(h, '.claude') },
   { label: 'Cursor',          detectionPath: (h) => join(h, '.cursor') },
   { label: 'VS Code Copilot', detectionPath: (h) => join(h, '.vscode') },
@@ -108,6 +229,16 @@ export async function runSetup(opts?: SetupOptions): Promise<void> {
 
   for (const client of detected) {
     log(`  ${client.label}`)
+  }
+
+  for (const client of detected) {
+    try {
+      if (client.setup) {
+        await client.setup(home, cwd, log)
+      }
+    } catch (err) {
+      log(`  ✗ ${client.label.padEnd(16)} failed: ${String(err)}`)
+    }
   }
 
   log('\nSetup complete.')
