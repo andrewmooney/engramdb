@@ -1,5 +1,111 @@
-import { describe, it, expect } from 'vitest';
-import { computeScore, recencyDecay } from '../src/memory.js';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { computeScore, recencyDecay, insertMemory, queryMemories, updateMemory, listProjects } from '../src/memory.js';
+import { createDb } from '../src/db.js';
+import type Database from 'better-sqlite3';
+
+describe('insertMemory', () => {
+  let db: Database.Database;
+  beforeEach(() => { db = createDb(':memory:'); });
+
+  it('returns id and created_at', () => {
+    const result = insertMemory(db, {
+      project_id: '/home/user/proj',
+      agent_id: 'test',
+      type: 'fact',
+      content: 'test content',
+      importance: 0.7,
+      embedding: new Float32Array(768).fill(0.1),
+    });
+    expect(result.id).toBeTruthy();
+    expect(result.created_at).toBeGreaterThan(0);
+  });
+
+  it('inserts into both memories and memory_embeddings', () => {
+    const { id } = insertMemory(db, {
+      project_id: '/home/user/proj',
+      agent_id: 'test',
+      type: 'fact',
+      content: 'test content',
+      importance: 0.5,
+      embedding: new Float32Array(768).fill(0.1),
+    });
+    const mem = db.prepare('SELECT id FROM memories WHERE id = ?').get(id);
+    expect(mem).toBeTruthy();
+  });
+});
+
+describe('queryMemories', () => {
+  let db: Database.Database;
+  beforeEach(() => { db = createDb(':memory:'); });
+
+  it('returns empty array when no memories', () => {
+    const result = queryMemories(db, {
+      embedding: new Float32Array(768).fill(0.1),
+      limit: 5,
+    });
+    expect(result).toEqual([]);
+  });
+
+  it('returns scored results for matching project', () => {
+    insertMemory(db, {
+      project_id: '/home/user/proj',
+      agent_id: 'test',
+      type: 'fact',
+      content: 'React TypeScript project',
+      importance: 0.8,
+      embedding: new Float32Array(768).fill(0.1),
+    });
+    const results = queryMemories(db, {
+      embedding: new Float32Array(768).fill(0.1),
+      project_id: '/home/user/proj',
+      limit: 5,
+    });
+    expect(results.length).toBe(1);
+    expect(results[0].score).toBeGreaterThan(0);
+  });
+});
+
+describe('updateMemory', () => {
+  let db: Database.Database;
+  beforeEach(() => { db = createDb(':memory:'); });
+
+  it('returns null for unknown id', () => {
+    const result = updateMemory(db, 'nonexistent-id', { importance: 0.9 });
+    expect(result).toBeNull();
+  });
+
+  it('updates importance', () => {
+    const { id } = insertMemory(db, {
+      project_id: '/p',
+      agent_id: 'a',
+      type: 'fact',
+      content: 'test',
+      importance: 0.3,
+      embedding: new Float32Array(768).fill(0.1),
+    });
+    updateMemory(db, id, { importance: 0.9 });
+    const row = db.prepare('SELECT importance FROM memories WHERE id = ?').get(id) as { importance: number };
+    expect(row.importance).toBeCloseTo(0.9);
+  });
+});
+
+describe('listProjects', () => {
+  let db: Database.Database;
+  beforeEach(() => { db = createDb(':memory:'); });
+
+  it('returns empty array when no memories', () => {
+    expect(listProjects(db)).toEqual([]);
+  });
+
+  it('returns project with memory count', () => {
+    insertMemory(db, { project_id: '/p', agent_id: 'a', type: 'fact', content: 'x', importance: 0.5, embedding: new Float32Array(768).fill(0.1) });
+    insertMemory(db, { project_id: '/p', agent_id: 'a', type: 'fact', content: 'y', importance: 0.5, embedding: new Float32Array(768).fill(0.2) });
+    const projects = listProjects(db);
+    expect(projects).toHaveLength(1);
+    expect(projects[0].project_id).toBe('/p');
+    expect(projects[0].memory_count).toBe(2);
+  });
+});
 
 describe('recencyDecay', () => {
   it('returns 1.0 for current access', () => {

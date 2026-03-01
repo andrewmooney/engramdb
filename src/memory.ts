@@ -2,10 +2,10 @@ import type Database from 'better-sqlite3';
 import { v4 as uuidv4 } from 'uuid';
 import type { Memory, MemoryType, MemoryWithScore } from './types.js';
 
-const W_SIM = parseFloat(process.env.MTMEM_W_SIM ?? '0.6');
-const W_IMP = parseFloat(process.env.MTMEM_W_IMP ?? '0.25');
-const W_REC = parseFloat(process.env.MTMEM_W_REC ?? '0.15');
-const LAMBDA = parseFloat(process.env.MTMEM_DECAY_LAMBDA ?? '0.01');
+const W_SIM    = parseFloat(process.env.MTMEM_W_SIM    ?? '') || 0.6;
+const W_IMP    = parseFloat(process.env.MTMEM_W_IMP    ?? '') || 0.25;
+const W_REC    = parseFloat(process.env.MTMEM_W_REC    ?? '') || 0.15;
+const LAMBDA   = parseFloat(process.env.MTMEM_DECAY_LAMBDA ?? '') || 0.01;
 
 export function recencyDecay(lastAccessedAt: number, now: number): number {
   const daysSince = (now - lastAccessedAt) / (1000 * 60 * 60 * 24);
@@ -40,16 +40,20 @@ export function insertMemory(
   const id = uuidv4();
   const now = Date.now();
 
-  db.prepare(`
-    INSERT INTO memories (id, project_id, agent_id, type, content, importance,
-                          access_count, created_at, updated_at, last_accessed_at)
-    VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
-  `).run(id, params.project_id, params.agent_id, params.type, params.content,
-         params.importance, now, now, now);
+  const doInsert = db.transaction(() => {
+    db.prepare(`
+      INSERT INTO memories (id, project_id, agent_id, type, content, importance,
+                            access_count, created_at, updated_at, last_accessed_at)
+      VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
+    `).run(id, params.project_id, params.agent_id, params.type, params.content,
+           params.importance, now, now, now);
 
-  db.prepare(`
-    INSERT INTO memory_embeddings (id, embedding) VALUES (?, ?)
-  `).run(id, params.embedding);
+    db.prepare(`
+      INSERT INTO memory_embeddings (id, embedding) VALUES (?, ?)
+    `).run(id, params.embedding);
+  });
+
+  doInsert();
 
   return { id, created_at: now };
 }
@@ -91,7 +95,10 @@ export function queryMemories(
 
   const scored = rows.map(row => {
     const distance = distanceMap.get(row.id) ?? 1;
-    const similarity = 1 - distance; // sqlite-vec returns L2 distance for normalized vecs
+    // For unit-normalized vectors, L2 distance and cosine similarity are related by:
+    //   cosine_similarity = 1 - (L2² / 2)
+    // Using `1 - distance` would be incorrect; squaring the distance gives the right conversion.
+    const similarity = 1 - (distance * distance) / 2;
     return {
       ...row,
       score: computeScore({ similarity, importance: row.importance, lastAccessedAt: row.last_accessed_at, now }),
@@ -128,12 +135,17 @@ export function updateMemory(
   if (fields.type       !== undefined) { sets.push('type = ?');       args.push(fields.type); }
 
   args.push(id);
-  (db.prepare(`UPDATE memories SET ${sets.join(', ')} WHERE id = ?`).run as (...a: unknown[]) => void)(...args);
 
-  if (fields.embedding) {
-    db.prepare('UPDATE memory_embeddings SET embedding = ? WHERE id = ?')
-      .run(fields.embedding, id);
-  }
+  const doUpdate = db.transaction(() => {
+    (db.prepare(`UPDATE memories SET ${sets.join(', ')} WHERE id = ?`).run as (...a: unknown[]) => void)(...args);
+
+    if (fields.embedding) {
+      db.prepare('UPDATE memory_embeddings SET embedding = ? WHERE id = ?')
+        .run(fields.embedding, id);
+    }
+  });
+
+  doUpdate();
 
   return { id, updated_at: now };
 }
