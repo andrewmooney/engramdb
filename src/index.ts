@@ -1,4 +1,9 @@
 #!/usr/bin/env node
+if (process.argv[2] === 'setup') {
+  const { runSetup } = await import('./setup.js')
+  await runSetup()
+  process.exit(0)
+}
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import express from 'express';

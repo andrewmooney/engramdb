@@ -253,10 +253,6 @@ export async function runSetup(opts?: SetupOptions): Promise<void> {
   }
 
   for (const client of detected) {
-    log(`  ${client.label}`)
-  }
-
-  for (const client of detected) {
     try {
       if (client.setup) {
         await client.setup(home, cwd, log)
@@ -268,5 +264,5 @@ export async function runSetup(opts?: SetupOptions): Promise<void> {
     }
   }
 
-  log('\nSetup complete.')
+  log('\nSetup complete. Restart your AI client to load the changes.')
 }
