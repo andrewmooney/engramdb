@@ -32,6 +32,13 @@ describe('remember_memory tool', () => {
       handleRemember(db, { project_id: '', agent_id: 'opencode', type: 'fact', content: 'test', importance: 0.5 })
     ).rejects.toThrow();
   });
+
+  it('throws for empty content', async () => {
+    const { handleRemember } = await import('../src/tools/remember.js');
+    await expect(
+      handleRemember(db, { project_id: '/p', agent_id: 'a', type: 'fact', content: '', importance: 0.5 })
+    ).rejects.toThrow();
+  });
 });
 
 describe('recall_memories tool', () => {
@@ -53,6 +60,11 @@ describe('recall_memories tool', () => {
     expect(results.length).toBeGreaterThan(0);
     expect(results[0]).toHaveProperty('score');
   });
+
+  it('throws for empty query', async () => {
+    const { handleRecall } = await import('../src/tools/recall.js');
+    await expect(handleRecall(db, { project_id: '/p', query: '' })).rejects.toThrow();
+  });
 });
 
 describe('search_global tool', () => {
@@ -68,6 +80,11 @@ describe('search_global tool', () => {
     });
     const results = await handleSearchGlobal(db, { query: 'Express', limit: 5 });
     expect(results.length).toBeGreaterThan(0);
+  });
+
+  it('throws for empty query', async () => {
+    const { handleSearchGlobal } = await import('../src/tools/search-global.js');
+    await expect(handleSearchGlobal(db, { query: '' })).rejects.toThrow();
   });
 });
 

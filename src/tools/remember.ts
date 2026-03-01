@@ -8,6 +8,12 @@ export async function handleRemember(
   input: { project_id: string; agent_id: string; type: MemoryType; content: string; importance?: number }
 ) {
   if (!input.project_id) throw new Error('project_id is required');
-  const embedding = await embed(input.content);
-  return insertMemory(db, { ...input, importance: input.importance ?? 0.5, embedding });
+  if (!input.content?.trim()) throw new Error('content is required and must not be empty');
+  if (!input.agent_id?.trim()) throw new Error('agent_id is required and must not be empty');
+  const importance = Math.max(0, Math.min(1, input.importance ?? 0.5));
+  const embedding = await embed(input.content).catch((err: unknown) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`[mtmem] Embedding failed: ${msg}`);
+  });
+  return insertMemory(db, { ...input, importance, embedding });
 }
