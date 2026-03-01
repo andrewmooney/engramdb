@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { mkdtemp, rm, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { runSetup, appendAgentsMd } from './setup.js'
+import { runSetup, appendAgentsMd, pathExists } from './setup.js'
 
 describe('runSetup', () => {
   it('runs without error when no clients are detected', async () => {
@@ -178,5 +178,65 @@ it('appendAgentsMd does not duplicate when sentinel present', async () => {
     expect(count).toBe(1)
   } finally {
     await rm(dir, { recursive: true, force: true })
+  }
+})
+
+it('Claude Code: creates ~/.claude/CLAUDE.md', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'mtmem-setup-test-'))
+  const cwd = await mkdtemp(join(tmpdir(), 'mtmem-setup-cwd-'))
+  try {
+    await mkdir(join(home, '.claude'), { recursive: true })
+    await runSetup({ homeDir: home, cwd, log: () => {} })
+    const content = await readFile(join(home, '.claude', 'CLAUDE.md'), 'utf8')
+    expect(content).toContain('## Memory (mtmem)')
+  } finally {
+    await rm(home, { recursive: true, force: true })
+    await rm(cwd, { recursive: true, force: true })
+  }
+})
+
+it('Cursor: creates ~/.cursor/rules/mtmem.md', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'mtmem-setup-test-'))
+  const cwd = await mkdtemp(join(tmpdir(), 'mtmem-setup-cwd-'))
+  try {
+    await mkdir(join(home, '.cursor'), { recursive: true })
+    await runSetup({ homeDir: home, cwd, log: () => {} })
+    const content = await readFile(join(home, '.cursor', 'rules', 'mtmem.md'), 'utf8')
+    expect(content).toContain('## Memory (mtmem)')
+  } finally {
+    await rm(home, { recursive: true, force: true })
+    await rm(cwd, { recursive: true, force: true })
+  }
+})
+
+it('VS Code Copilot: creates .github/copilot-instructions.md in cwd', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'mtmem-setup-test-'))
+  const cwd = await mkdtemp(join(tmpdir(), 'mtmem-setup-cwd-'))
+  try {
+    await mkdir(join(home, '.vscode'), { recursive: true })
+    await runSetup({ homeDir: home, cwd, log: () => {} })
+    const content = await readFile(join(cwd, '.github', 'copilot-instructions.md'), 'utf8')
+    expect(content).toContain('## Memory (mtmem)')
+  } finally {
+    await rm(home, { recursive: true, force: true })
+    await rm(cwd, { recursive: true, force: true })
+  }
+})
+
+it('Claude Desktop: detected but no files written', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'mtmem-setup-test-'))
+  const cwd = await mkdtemp(join(tmpdir(), 'mtmem-setup-cwd-'))
+  const lines: string[] = []
+  try {
+    // macOS detection path simulation
+    await mkdir(join(home, 'Library', 'Application Support', 'Claude'), { recursive: true })
+    await runSetup({ homeDir: home, cwd, log: (l) => lines.push(l) })
+    expect(lines.some((l) => l.includes('Claude Desktop'))).toBe(true)
+    // No files written (no AGENTS.md for Claude Desktop)
+    const hasAgentsMd = await pathExists(join(home, 'Library', 'Application Support', 'Claude', 'AGENTS.md'))
+    expect(hasAgentsMd).toBe(false)
+  } finally {
+    await rm(home, { recursive: true, force: true })
+    await rm(cwd, { recursive: true, force: true })
   }
 })

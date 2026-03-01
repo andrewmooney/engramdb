@@ -12,6 +12,7 @@ interface ClientDescriptor {
   label: string
   detectionPath: (home: string) => string
   setup?: (home: string, cwd: string, log: (l: string) => void) => Promise<void>
+  report?: (log: (l: string) => void) => void
 }
 
 const OPENCODE_PLUGIN_SOURCE = `import type { Plugin } from "@opencode-ai/plugin"
@@ -134,15 +135,39 @@ async function setupOpenCode(home: string, log: (l: string) => void): Promise<vo
   log('  ✓ OpenCode        plugin installed, AGENTS.md updated')
 }
 
+async function setupClaudeCode(home: string, log: (l: string) => void): Promise<void> {
+  await appendAgentsMd(join(home, '.claude', 'CLAUDE.md'))
+  log('  ✓ Claude Code     CLAUDE.md updated')
+}
+
+async function setupCursor(home: string, log: (l: string) => void): Promise<void> {
+  const rulesDir = join(home, '.cursor', 'rules')
+  await mkdir(rulesDir, { recursive: true })
+  await writeFile(join(rulesDir, 'mtmem.md'), AGENTS_MD_SECTION.trim())
+  log('  ✓ Cursor          rules file written (~/.cursor/rules/mtmem.md)')
+}
+
+async function setupVSCode(_home: string, cwd: string, log: (l: string) => void): Promise<void> {
+  const githubDir = join(cwd, '.github')
+  await mkdir(githubDir, { recursive: true })
+  await appendAgentsMd(join(githubDir, 'copilot-instructions.md'))
+  log('  ✓ VS Code Copilot .github/copilot-instructions.md updated')
+}
+
+function reportClaudeDesktop(log: (l: string) => void): void {
+  log('  - Claude Desktop  detected — no instruction file path (configure manually via Claude Projects)')
+}
+
 const CLIENTS: ClientDescriptor[] = [
   { label: 'OpenCode',        detectionPath: (h) => join(h, '.config', 'opencode'), setup: (h, _c, l) => setupOpenCode(h, l) },
-  { label: 'Claude Code',     detectionPath: (h) => join(h, '.claude') },
-  { label: 'Cursor',          detectionPath: (h) => join(h, '.cursor') },
-  { label: 'VS Code Copilot', detectionPath: (h) => join(h, '.vscode') },
+  { label: 'Claude Code',     detectionPath: (h) => join(h, '.claude'),             setup: (h, _c, l) => setupClaudeCode(h, l) },
+  { label: 'Cursor',          detectionPath: (h) => join(h, '.cursor'),             setup: (h, _c, l) => setupCursor(h, l) },
+  { label: 'VS Code Copilot', detectionPath: (h) => join(h, '.vscode'),             setup: (h, c, l) => setupVSCode(h, c, l) },
   { label: 'Claude Desktop',  detectionPath: (h) =>
       process.platform === 'win32'
         ? join(process.env['APPDATA'] ?? join(h, 'AppData', 'Roaming'), 'Claude')
-        : join(h, 'Library', 'Application Support', 'Claude') },
+        : join(h, 'Library', 'Application Support', 'Claude'),
+    report: reportClaudeDesktop },
 ]
 
 export async function pathExists(p: string): Promise<boolean> {
@@ -235,6 +260,8 @@ export async function runSetup(opts?: SetupOptions): Promise<void> {
     try {
       if (client.setup) {
         await client.setup(home, cwd, log)
+      } else if (client.report) {
+        client.report(log)
       }
     } catch (err) {
       log(`  ✗ ${client.label.padEnd(16)} failed: ${String(err)}`)
