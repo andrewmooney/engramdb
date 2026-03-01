@@ -85,11 +85,24 @@ Add to `~/.config/opencode/config.json`:
   "mcp": {
     "mtmem": {
       "type": "local",
-      "command": "mtmem",
-      "args": []
+      "command": ["mtmem"]
     }
   }
 }
+```
+
+### Claude Code
+
+Run once in your terminal (adds to user scope, available across all projects):
+
+```bash
+claude mcp add --transport stdio --scope user mtmem -- mtmem
+```
+
+Or for project scope only (shared via `.mcp.json`):
+
+```bash
+claude mcp add --transport stdio --scope project mtmem -- mtmem
 ```
 
 ### Claude Desktop
