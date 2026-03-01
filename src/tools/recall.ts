@@ -10,7 +10,7 @@ export async function handleRecall(
   if (!input.query?.trim()) throw new Error('query is required and must not be empty');
   const embedding = await embed(input.query).catch((err: unknown) => {
     const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(`[mtmem] Embedding failed: ${msg}`);
+    throw new Error(`[engramdb] Embedding failed: ${msg}`);
   });
   return queryMemories(db, {
     embedding,

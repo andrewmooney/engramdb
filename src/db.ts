@@ -4,7 +4,7 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { mkdirSync } from 'fs';
 
-export const DEFAULT_DB_PATH = process.env.MTMEM_DB_PATH ?? join(homedir(), '.global-agent-memory.db');
+export const DEFAULT_DB_PATH = process.env.ENGRAMDB_DB_PATH ?? join(homedir(), '.global-agent-memory.db');
 
 export function createDb(path: string = DEFAULT_DB_PATH): Database.Database {
   if (path !== ':memory:') {
@@ -17,7 +17,7 @@ export function createDb(path: string = DEFAULT_DB_PATH): Database.Database {
     load(db);
   } catch (err) {
     throw new Error(
-      `[mtmem] Failed to load sqlite-vec extension. Is 'sqlite-vec' installed for your platform?\nOriginal error: ${err}`
+      `[engramdb] Failed to load sqlite-vec extension. Is 'sqlite-vec' installed for your platform?\nOriginal error: ${err}`
     );
   }
 

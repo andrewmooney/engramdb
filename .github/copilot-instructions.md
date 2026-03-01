@@ -1,7 +1,7 @@
 
-## Memory (mtmem)
+## Memory (engramdb)
 
-You have persistent memory via the `mtmem` MCP server. A plugin handles the lifecycle
+You have persistent memory via the `engramdb` MCP server. A plugin handles the lifecycle
 automatically (opening/closing conversations, loading prior context at session start).
 Your job is to make judgment calls about what's worth storing.
 

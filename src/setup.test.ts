@@ -6,8 +6,8 @@ import { runSetup, appendAgentsMd, pathExists } from './setup.js'
 
 describe('runSetup', () => {
   it('runs without error when no clients are detected', async () => {
-    const home = await mkdtemp(join(tmpdir(), 'mtmem-setup-test-'))
-    const cwd = await mkdtemp(join(tmpdir(), 'mtmem-setup-cwd-'))
+    const home = await mkdtemp(join(tmpdir(), 'engramdb-setup-test-'))
+    const cwd = await mkdtemp(join(tmpdir(), 'engramdb-setup-cwd-'))
     const lines: string[] = []
     try {
       await expect(
@@ -22,8 +22,8 @@ describe('runSetup', () => {
 })
 
 it('detects OpenCode when ~/.config/opencode/ exists', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'mtmem-setup-test-'))
-  const cwd = await mkdtemp(join(tmpdir(), 'mtmem-setup-cwd-'))
+  const home = await mkdtemp(join(tmpdir(), 'engramdb-setup-test-'))
+  const cwd = await mkdtemp(join(tmpdir(), 'engramdb-setup-cwd-'))
   const lines: string[] = []
   try {
     await mkdir(join(home, '.config', 'opencode'), { recursive: true })
@@ -36,8 +36,8 @@ it('detects OpenCode when ~/.config/opencode/ exists', async () => {
 })
 
 it('detects Claude Code when ~/.claude/ exists', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'mtmem-setup-test-'))
-  const cwd = await mkdtemp(join(tmpdir(), 'mtmem-setup-cwd-'))
+  const home = await mkdtemp(join(tmpdir(), 'engramdb-setup-test-'))
+  const cwd = await mkdtemp(join(tmpdir(), 'engramdb-setup-cwd-'))
   const lines: string[] = []
   try {
     await mkdir(join(home, '.claude'), { recursive: true })
@@ -50,8 +50,8 @@ it('detects Claude Code when ~/.claude/ exists', async () => {
 })
 
 it('detects Cursor when ~/.cursor/ exists', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'mtmem-setup-test-'))
-  const cwd = await mkdtemp(join(tmpdir(), 'mtmem-setup-cwd-'))
+  const home = await mkdtemp(join(tmpdir(), 'engramdb-setup-test-'))
+  const cwd = await mkdtemp(join(tmpdir(), 'engramdb-setup-cwd-'))
   const lines: string[] = []
   try {
     await mkdir(join(home, '.cursor'), { recursive: true })
@@ -64,8 +64,8 @@ it('detects Cursor when ~/.cursor/ exists', async () => {
 })
 
 it('detects VS Code when ~/.vscode/ exists', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'mtmem-setup-test-'))
-  const cwd = await mkdtemp(join(tmpdir(), 'mtmem-setup-cwd-'))
+  const home = await mkdtemp(join(tmpdir(), 'engramdb-setup-test-'))
+  const cwd = await mkdtemp(join(tmpdir(), 'engramdb-setup-cwd-'))
   const lines: string[] = []
   try {
     await mkdir(join(home, '.vscode'), { recursive: true })
@@ -78,12 +78,12 @@ it('detects VS Code when ~/.vscode/ exists', async () => {
 })
 
 it('appendAgentsMd creates file when absent', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'mtmem-agents-test-'))
+  const dir = await mkdtemp(join(tmpdir(), 'engramdb-agents-test-'))
   try {
     const filePath = join(dir, 'AGENTS.md')
     await appendAgentsMd(filePath)
     const content = await readFile(filePath, 'utf8')
-    expect(content).toContain('## Memory (mtmem)')
+    expect(content).toContain('## Memory (engramdb)')
     expect(content).toContain('remember_memory')
   } finally {
     await rm(dir, { recursive: true, force: true })
@@ -91,30 +91,30 @@ it('appendAgentsMd creates file when absent', async () => {
 })
 
 it('appendAgentsMd appends to existing file', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'mtmem-agents-test-'))
+  const dir = await mkdtemp(join(tmpdir(), 'engramdb-agents-test-'))
   try {
     const filePath = join(dir, 'AGENTS.md')
     await writeFile(filePath, '# Existing content\n\nSome rules here.\n')
     await appendAgentsMd(filePath)
     const content = await readFile(filePath, 'utf8')
     expect(content).toContain('# Existing content')
-    expect(content).toContain('## Memory (mtmem)')
+    expect(content).toContain('## Memory (engramdb)')
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
 })
 
 it('OpenCode: writes plugin, updates package.json, writes AGENTS.md', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'mtmem-setup-test-'))
-  const cwd = await mkdtemp(join(tmpdir(), 'mtmem-setup-cwd-'))
+  const home = await mkdtemp(join(tmpdir(), 'engramdb-setup-test-'))
+  const cwd = await mkdtemp(join(tmpdir(), 'engramdb-setup-cwd-'))
   const lines: string[] = []
   try {
     await mkdir(join(home, '.config', 'opencode'), { recursive: true })
     await runSetup({ homeDir: home, cwd, log: (l) => lines.push(l) })
 
     // Plugin written
-    const plugin = await readFile(join(home, '.config', 'opencode', 'plugins', 'mtmem.ts'), 'utf8')
-    expect(plugin).toContain('MtmemPlugin')
+    const plugin = await readFile(join(home, '.config', 'opencode', 'plugins', 'engramdb.ts'), 'utf8')
+    expect(plugin).toContain('EngramdbPlugin')
 
     // package.json has dependency
     const pkg = JSON.parse(await readFile(join(home, '.config', 'opencode', 'package.json'), 'utf8'))
@@ -122,7 +122,7 @@ it('OpenCode: writes plugin, updates package.json, writes AGENTS.md', async () =
 
     // AGENTS.md written
     const agents = await readFile(join(home, '.config', 'opencode', 'AGENTS.md'), 'utf8')
-    expect(agents).toContain('## Memory (mtmem)')
+    expect(agents).toContain('## Memory (engramdb)')
 
     // Output line
     expect(lines.some((l) => l.includes('OpenCode') && l.includes('✓'))).toBe(true)
@@ -133,8 +133,8 @@ it('OpenCode: writes plugin, updates package.json, writes AGENTS.md', async () =
 })
 
 it('OpenCode: merges into existing package.json without clobbering', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'mtmem-setup-test-'))
-  const cwd = await mkdtemp(join(tmpdir(), 'mtmem-setup-cwd-'))
+  const home = await mkdtemp(join(tmpdir(), 'engramdb-setup-test-'))
+  const cwd = await mkdtemp(join(tmpdir(), 'engramdb-setup-cwd-'))
   try {
     await mkdir(join(home, '.config', 'opencode'), { recursive: true })
     await writeFile(
@@ -152,15 +152,15 @@ it('OpenCode: merges into existing package.json without clobbering', async () =>
 })
 
 it('OpenCode: overwrites plugin file on re-run', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'mtmem-setup-test-'))
-  const cwd = await mkdtemp(join(tmpdir(), 'mtmem-setup-cwd-'))
+  const home = await mkdtemp(join(tmpdir(), 'engramdb-setup-test-'))
+  const cwd = await mkdtemp(join(tmpdir(), 'engramdb-setup-cwd-'))
   try {
     await mkdir(join(home, '.config', 'opencode', 'plugins'), { recursive: true })
-    await writeFile(join(home, '.config', 'opencode', 'plugins', 'mtmem.ts'), '// old plugin')
+    await writeFile(join(home, '.config', 'opencode', 'plugins', 'engramdb.ts'), '// old plugin')
     await runSetup({ homeDir: home, cwd, log: () => {} })
-    const plugin = await readFile(join(home, '.config', 'opencode', 'plugins', 'mtmem.ts'), 'utf8')
+    const plugin = await readFile(join(home, '.config', 'opencode', 'plugins', 'engramdb.ts'), 'utf8')
     expect(plugin).not.toContain('// old plugin')
-    expect(plugin).toContain('MtmemPlugin')
+    expect(plugin).toContain('EngramdbPlugin')
   } finally {
     await rm(home, { recursive: true, force: true })
     await rm(cwd, { recursive: true, force: true })
@@ -168,13 +168,13 @@ it('OpenCode: overwrites plugin file on re-run', async () => {
 })
 
 it('appendAgentsMd does not duplicate when sentinel present', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'mtmem-agents-test-'))
+  const dir = await mkdtemp(join(tmpdir(), 'engramdb-agents-test-'))
   try {
     const filePath = join(dir, 'AGENTS.md')
     await appendAgentsMd(filePath)
     await appendAgentsMd(filePath) // second call
     const content = await readFile(filePath, 'utf8')
-    const count = (content.match(/## Memory \(mtmem\)/g) ?? []).length
+    const count = (content.match(/## Memory \(engramdb\)/g) ?? []).length
     expect(count).toBe(1)
   } finally {
     await rm(dir, { recursive: true, force: true })
@@ -182,27 +182,27 @@ it('appendAgentsMd does not duplicate when sentinel present', async () => {
 })
 
 it('Claude Code: creates ~/.claude/CLAUDE.md', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'mtmem-setup-test-'))
-  const cwd = await mkdtemp(join(tmpdir(), 'mtmem-setup-cwd-'))
+  const home = await mkdtemp(join(tmpdir(), 'engramdb-setup-test-'))
+  const cwd = await mkdtemp(join(tmpdir(), 'engramdb-setup-cwd-'))
   try {
     await mkdir(join(home, '.claude'), { recursive: true })
     await runSetup({ homeDir: home, cwd, log: () => {} })
     const content = await readFile(join(home, '.claude', 'CLAUDE.md'), 'utf8')
-    expect(content).toContain('## Memory (mtmem)')
+    expect(content).toContain('## Memory (engramdb)')
   } finally {
     await rm(home, { recursive: true, force: true })
     await rm(cwd, { recursive: true, force: true })
   }
 })
 
-it('Cursor: creates ~/.cursor/rules/mtmem.md', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'mtmem-setup-test-'))
-  const cwd = await mkdtemp(join(tmpdir(), 'mtmem-setup-cwd-'))
+it('Cursor: creates ~/.cursor/rules/engramdb.md', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'engramdb-setup-test-'))
+  const cwd = await mkdtemp(join(tmpdir(), 'engramdb-setup-cwd-'))
   try {
     await mkdir(join(home, '.cursor'), { recursive: true })
     await runSetup({ homeDir: home, cwd, log: () => {} })
-    const content = await readFile(join(home, '.cursor', 'rules', 'mtmem.md'), 'utf8')
-    expect(content).toContain('## Memory (mtmem)')
+    const content = await readFile(join(home, '.cursor', 'rules', 'engramdb.md'), 'utf8')
+    expect(content).toContain('## Memory (engramdb)')
   } finally {
     await rm(home, { recursive: true, force: true })
     await rm(cwd, { recursive: true, force: true })
@@ -210,13 +210,13 @@ it('Cursor: creates ~/.cursor/rules/mtmem.md', async () => {
 })
 
 it('VS Code Copilot: creates .github/copilot-instructions.md in cwd', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'mtmem-setup-test-'))
-  const cwd = await mkdtemp(join(tmpdir(), 'mtmem-setup-cwd-'))
+  const home = await mkdtemp(join(tmpdir(), 'engramdb-setup-test-'))
+  const cwd = await mkdtemp(join(tmpdir(), 'engramdb-setup-cwd-'))
   try {
     await mkdir(join(home, '.vscode'), { recursive: true })
     await runSetup({ homeDir: home, cwd, log: () => {} })
     const content = await readFile(join(cwd, '.github', 'copilot-instructions.md'), 'utf8')
-    expect(content).toContain('## Memory (mtmem)')
+    expect(content).toContain('## Memory (engramdb)')
   } finally {
     await rm(home, { recursive: true, force: true })
     await rm(cwd, { recursive: true, force: true })
@@ -224,8 +224,8 @@ it('VS Code Copilot: creates .github/copilot-instructions.md in cwd', async () =
 })
 
 it('Claude Desktop: detected but no files written', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'mtmem-setup-test-'))
-  const cwd = await mkdtemp(join(tmpdir(), 'mtmem-setup-cwd-'))
+  const home = await mkdtemp(join(tmpdir(), 'engramdb-setup-test-'))
+  const cwd = await mkdtemp(join(tmpdir(), 'engramdb-setup-cwd-'))
   const lines: string[] = []
   try {
     // macOS detection path simulation

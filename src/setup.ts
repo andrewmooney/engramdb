@@ -31,11 +31,11 @@ async function callMtmem(toolName: string, args: Record<string, unknown>): Promi
     params: { name: toolName, arguments: args },
   }
   const json = JSON.stringify(request)
-  const result = await $\`mtmem\`.stdin(json).json()
+  const result = await $\`engramdb\`.stdin(json).json()
   return result
 }
 
-export const MtmemPlugin: Plugin = async ({ client, directory }) => {
+export const EngramdbPlugin: Plugin = async ({ client, directory }) => {
   const projectId = path.basename(directory)
   const agentId = "opencode"
 
@@ -54,7 +54,7 @@ export const MtmemPlugin: Plugin = async ({ client, directory }) => {
           if (parsed.id) conversationMap.set(sessionId, parsed.id)
           await callMtmem("recall_memories", { project_id: projectId, query: "recent work, decisions, patterns", limit: 10 })
           await callMtmem("search_conversations", { project_id: projectId, query: "recent sessions", limit: 3 })
-          await client.app.log({ body: { service: "mtmem-plugin", level: "info", message: "session.created: conversation opened", extra: { sessionId, conversationId: parsed.id } } })
+          await client.app.log({ body: { service: "engramdb-plugin", level: "info", message: "session.created: conversation opened", extra: { sessionId, conversationId: parsed.id } } })
         } else if (event.type === "session.idle") {
           const sessionID = (event.properties as { sessionID?: string }).sessionID
           if (!sessionID) return
@@ -71,9 +71,9 @@ export const MtmemPlugin: Plugin = async ({ client, directory }) => {
             if (!content) return
             await callMtmem("append_turn", { conversation_id: conversationId, role: "assistant", content })
             if (msgId) lastAppendedMap.set(sessionID, msgId)
-            await client.app.log({ body: { service: "mtmem-plugin", level: "debug", message: "session.idle: turn appended", extra: { sessionID, msgId } } })
+            await client.app.log({ body: { service: "engramdb-plugin", level: "debug", message: "session.idle: turn appended", extra: { sessionID, msgId } } })
           } catch (err) {
-            await client.app.log({ body: { service: "mtmem-plugin", level: "warn", message: "session.idle: append_turn failed", extra: { error: String(err), sessionID } } })
+            await client.app.log({ body: { service: "engramdb-plugin", level: "warn", message: "session.idle: append_turn failed", extra: { error: String(err), sessionID } } })
           }
         } else if (event.type === "session.deleted") {
           const sessionId = (event.properties as { info?: { id?: string } })?.info?.id
@@ -91,18 +91,18 @@ export const MtmemPlugin: Plugin = async ({ client, directory }) => {
             await callMtmem("close_conversation", { conversation_id: conversationId, summary: summary || "Session ended." })
             conversationMap.delete(sessionId)
             lastAppendedMap.delete(sessionId)
-            await client.app.log({ body: { service: "mtmem-plugin", level: "info", message: "session.deleted: conversation closed", extra: { sessionId, conversationId } } })
+            await client.app.log({ body: { service: "engramdb-plugin", level: "info", message: "session.deleted: conversation closed", extra: { sessionId, conversationId } } })
           } catch (err) {
-            await client.app.log({ body: { service: "mtmem-plugin", level: "warn", message: "session.deleted: close_conversation failed", extra: { error: String(err), sessionId } } })
+            await client.app.log({ body: { service: "engramdb-plugin", level: "warn", message: "session.deleted: close_conversation failed", extra: { error: String(err), sessionId } } })
             conversationMap.delete(sessionId)
             lastAppendedMap.delete(sessionId)
           }
         } else if (event.type.startsWith("session.")) {
-          await client.app.log({ body: { service: "mtmem-plugin", level: "debug", message: \`event: \${event.type}\`, extra: event.properties } })
+          await client.app.log({ body: { service: "engramdb-plugin", level: "debug", message: \`event: \${event.type}\`, extra: event.properties } })
         }
       } catch (err) {
         try {
-          await client.app.log({ body: { service: "mtmem-plugin", level: "warn", message: "mtmem-plugin event handler error", extra: { event: event.type, error: String(err) } } })
+          await client.app.log({ body: { service: "engramdb-plugin", level: "warn", message: "engramdb-plugin event handler error", extra: { event: event.type, error: String(err) } } })
         } catch { /* never throw */ }
       }
     },
@@ -116,7 +116,7 @@ async function setupOpenCode(home: string, log: (l: string) => void): Promise<vo
 
   // 1. Write plugin
   await mkdir(pluginsDir, { recursive: true })
-  await writeFile(join(pluginsDir, 'mtmem.ts'), OPENCODE_PLUGIN_SOURCE)
+  await writeFile(join(pluginsDir, 'engramdb.ts'), OPENCODE_PLUGIN_SOURCE)
 
   // 2. Patch package.json
   const pkgPath = join(baseDir, 'package.json')
@@ -132,8 +132,7 @@ async function setupOpenCode(home: string, log: (l: string) => void): Promise<vo
   // 3. Append AGENTS.md
   await appendAgentsMd(join(baseDir, 'AGENTS.md'))
 
-  log('  ✓ OpenCode        plugin installed, AGENTS.md updated')
-}
+  log('  ✓ OpenCode        plugin installed, AGENTS.md updated')}
 
 async function setupClaudeCode(home: string, log: (l: string) => void): Promise<void> {
   await appendAgentsMd(join(home, '.claude', 'CLAUDE.md'))
@@ -143,8 +142,8 @@ async function setupClaudeCode(home: string, log: (l: string) => void): Promise<
 async function setupCursor(home: string, log: (l: string) => void): Promise<void> {
   const rulesDir = join(home, '.cursor', 'rules')
   await mkdir(rulesDir, { recursive: true })
-  await writeFile(join(rulesDir, 'mtmem.md'), AGENTS_MD_SECTION.trim())
-  log('  ✓ Cursor          rules file written (~/.cursor/rules/mtmem.md)')
+  await writeFile(join(rulesDir, 'engramdb.md'), AGENTS_MD_SECTION.trim())
+  log('  ✓ Cursor          rules file written (~/.cursor/rules/engramdb.md)')
 }
 
 async function setupVSCode(_home: string, cwd: string, log: (l: string) => void): Promise<void> {
@@ -174,12 +173,12 @@ export async function pathExists(p: string): Promise<boolean> {
   try { await access(p); return true } catch { return false }
 }
 
-const AGENTS_SENTINEL = '## Memory (mtmem)'
+const AGENTS_SENTINEL = '## Memory (engramdb)'
 
 const AGENTS_MD_SECTION = `
-## Memory (mtmem)
+## Memory (engramdb)
 
-You have persistent memory via the \`mtmem\` MCP server. A plugin handles the lifecycle
+You have persistent memory via the \`engramdb\` MCP server. A plugin handles the lifecycle
 automatically (opening/closing conversations, loading prior context at session start).
 Your job is to make judgment calls about what's worth storing.
 
@@ -236,7 +235,7 @@ export async function runSetup(opts?: SetupOptions): Promise<void> {
   const cwd = opts?.cwd ?? process.cwd()
   const log = opts?.log ?? console.log
 
-  log('\nmtmem setup\n')
+  log('\nengramdb setup\n')
 
   const detected: ClientDescriptor[] = []
   for (const client of CLIENTS) {

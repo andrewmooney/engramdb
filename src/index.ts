@@ -56,9 +56,9 @@ if (useHttp) {
   });
 
   app.listen(port, () => {
-    process.stderr.write(`[mtmem] HTTP/SSE MCP server listening on http://localhost:${port}/mcp\n`);
+    process.stderr.write(`[engramdb] HTTP/SSE MCP server listening on http://localhost:${port}/mcp\n`);
   }).on('error', (err: Error) => {
-    process.stderr.write(`[mtmem] Failed to start HTTP server: ${err.message}\n`);
+    process.stderr.write(`[engramdb] Failed to start HTTP server: ${err.message}\n`);
     process.exit(1);
   });
 } else {

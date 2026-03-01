@@ -9,7 +9,7 @@ export async function handleSearchConversations(
   if (!input.query?.trim()) throw new Error('query is required');
   const embedding = await embed(input.query).catch((err: unknown) => {
     const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(`[mtmem] Embedding failed: ${msg}`);
+    throw new Error(`[engramdb] Embedding failed: ${msg}`);
   });
   return queryConversations(db, {
     embedding,

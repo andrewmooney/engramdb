@@ -2,10 +2,10 @@ import type Database from 'better-sqlite3';
 import { v4 as uuidv4 } from 'uuid';
 import type { Memory, MemoryType, MemoryWithScore } from './types.js';
 
-const W_SIM    = parseFloat(process.env.MTMEM_W_SIM    ?? '') || 0.6;
-const W_IMP    = parseFloat(process.env.MTMEM_W_IMP    ?? '') || 0.25;
-const W_REC    = parseFloat(process.env.MTMEM_W_REC    ?? '') || 0.15;
-const LAMBDA   = parseFloat(process.env.MTMEM_DECAY_LAMBDA ?? '') || 0.01;
+const W_SIM    = parseFloat(process.env.ENGRAMDB_W_SIM    ?? '') || 0.6;
+const W_IMP    = parseFloat(process.env.ENGRAMDB_W_IMP    ?? '') || 0.25;
+const W_REC    = parseFloat(process.env.ENGRAMDB_W_REC    ?? '') || 0.15;
+const LAMBDA   = parseFloat(process.env.ENGRAMDB_DECAY_LAMBDA ?? '') || 0.01;
 
 export function recencyDecay(lastAccessedAt: number, now: number): number {
   const daysSince = (now - lastAccessedAt) / (1000 * 60 * 60 * 24);

@@ -1,18 +1,18 @@
-# mtmem
+# engramdb
 
 **Persistent, semantically-searchable memory for AI coding agents.**
 
-AI coding agents are stateless by default — every new session starts from scratch. `mtmem` gives your agents a long-term memory store they can read from and write to across projects, sessions, and tools. Agents can remember architectural decisions, learned preferences, recurring patterns, debugging notes, and anything else worth carrying forward. Memories are retrieved by semantic similarity, not keyword matching, so agents find relevant context even when the exact wording differs.
+AI coding agents are stateless by default — every new session starts from scratch. `engramdb` gives your agents a long-term memory store they can read from and write to across projects, sessions, and tools. Agents can remember architectural decisions, learned preferences, recurring patterns, debugging notes, and anything else worth carrying forward. Memories are retrieved by semantic similarity, not keyword matching, so agents find relevant context even when the exact wording differs.
 
-`mtmem` runs as an [MCP (Model Context Protocol)](https://modelcontextprotocol.io) server. Any MCP-compatible client — OpenCode, Claude Desktop, Cursor, GitHub Copilot — can connect to it and use its five tools to read and write memories.
+`engramdb` runs as an [MCP (Model Context Protocol)](https://modelcontextprotocol.io) server. Any MCP-compatible client — OpenCode, Claude Desktop, Cursor, GitHub Copilot — can connect to it and use its five tools to read and write memories.
 
 ---
 
 ## How it works
 
-When an agent stores a memory, `mtmem` generates a 768-dimensional embedding vector using [`nomic-embed-text-v1`](https://huggingface.co/nomic-ai/nomic-embed-text-v1) and persists both the text and the vector to a local SQLite database (`~/.global-agent-memory.db` by default). The database is shared across all projects and all agents on your machine.
+When an agent stores a memory, `engramdb` generates a 768-dimensional embedding vector using [`nomic-embed-text-v1`](https://huggingface.co/nomic-ai/nomic-embed-text-v1) and persists both the text and the vector to a local SQLite database (`~/.global-agent-memory.db` by default). The database is shared across all projects and all agents on your machine.
 
-When an agent retrieves memories, `mtmem` embeds the query and performs a nearest-neighbour search using `sqlite-vec`. Results are ranked by a weighted score:
+When an agent retrieves memories, `engramdb` embeds the query and performs a nearest-neighbour search using `sqlite-vec`. Results are ranked by a weighted score:
 
 ```
 score = 0.6 × cosine_similarity + 0.25 × importance + 0.15 × recency_decay
@@ -27,10 +27,10 @@ Memories are scoped to a `project_id` (usually a repository name or path). The `
 ## Installation
 
 ```bash
-npm install -g mtmem
+npm install -g engramdb
 ```
 
-> **Requirements:** Node.js ≥ 20. The first time you start `mtmem`, it will download the embedding model (~270 MB) from Hugging Face. Subsequent starts are fast.
+> **Requirements:** Node.js ≥ 20. The first time you start `engramdb`, it will download the embedding model (~270 MB) from Hugging Face. Subsequent starts are fast.
 
 ---
 
@@ -39,25 +39,25 @@ npm install -g mtmem
 Start the server in stdio mode (the default, used by most MCP clients):
 
 ```bash
-mtmem
+engramdb
 ```
 
 You should see:
 
 ```
-[mtmem] Loading embedding model (first run may take a moment)...
-[mtmem] Embedding model ready.
-[mtmem] MCP server running on stdio
+[engramdb] Loading embedding model (first run may take a moment)...
+[engramdb] Embedding model ready.
+[engramdb] MCP server running on stdio
 ```
 
 ---
 
 ## Setup
 
-Run `mtmem setup` to automatically configure your AI client(s). Setup detects which clients are installed and writes the appropriate agent instruction files.
+Run `engramdb setup` to automatically configure your AI client(s). Setup detects which clients are installed and writes the appropriate agent instruction files.
 
 ```bash
-mtmem setup
+engramdb setup
 ```
 
 **What it does per client:**
@@ -66,11 +66,11 @@ mtmem setup
 |---|---|
 | OpenCode | Installs the session lifecycle plugin + writes `~/.config/opencode/AGENTS.md` |
 | Claude Code | Appends memory instructions to `~/.claude/CLAUDE.md` |
-| Cursor | Writes `~/.cursor/rules/mtmem.md` |
+| Cursor | Writes `~/.cursor/rules/engramdb.md` |
 | VS Code Copilot | Writes `.github/copilot-instructions.md` in the current directory |
 | Claude Desktop | Detected but not configured — no global instruction file path |
 
-Setup is idempotent — safe to re-run after upgrading mtmem (the OpenCode plugin is always updated; instruction files are never duplicated).
+Setup is idempotent — safe to re-run after upgrading engramdb (the OpenCode plugin is always updated; instruction files are never duplicated).
 
 ---
 
@@ -83,9 +83,9 @@ Add to `~/.config/opencode/config.json`:
 ```json
 {
   "mcp": {
-    "mtmem": {
+    "engramdb": {
       "type": "local",
-      "command": ["mtmem"]
+      "command": ["engramdb"]
     }
   }
 }
@@ -96,13 +96,13 @@ Add to `~/.config/opencode/config.json`:
 Run once in your terminal (adds to user scope, available across all projects):
 
 ```bash
-claude mcp add --transport stdio --scope user mtmem -- mtmem
+claude mcp add --transport stdio --scope user engramdb -- engramdb
 ```
 
 Or for project scope only (shared via `.mcp.json`):
 
 ```bash
-claude mcp add --transport stdio --scope project mtmem -- mtmem
+claude mcp add --transport stdio --scope project engramdb -- engramdb
 ```
 
 ### Claude Desktop
@@ -112,8 +112,8 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
 ```json
 {
   "mcpServers": {
-    "mtmem": {
-      "command": "mtmem",
+    "engramdb": {
+      "command": "engramdb",
       "args": []
     }
   }
@@ -127,8 +127,8 @@ Add to `.cursor/mcp.json` in your home directory or project root:
 ```json
 {
   "mcpServers": {
-    "mtmem": {
-      "command": "mtmem",
+    "engramdb": {
+      "command": "engramdb",
       "args": []
     }
   }
@@ -142,9 +142,9 @@ Add to `.vscode/mcp.json` in your project, or to your VS Code user settings:
 ```json
 {
   "servers": {
-    "mtmem": {
+    "engramdb": {
       "type": "stdio",
-      "command": "mtmem",
+      "command": "engramdb",
       "args": []
     }
   }
@@ -409,38 +409,38 @@ Semantically search closed conversations by their summaries. Omit `project_id` t
 
 ## Configuration
 
-All configuration is done via environment variables. You can set these in your shell profile or pass them inline when starting `mtmem`.
+All configuration is done via environment variables. You can set these in your shell profile or pass them inline when starting `engramdb`.
 
 | Variable | Default | Description |
 |---|---|---|
-| `MTMEM_DB_PATH` | `~/.global-agent-memory.db` | Path to the SQLite database file. Useful if you want to isolate memories per machine or project. |
+| `ENGRAMDB_DB_PATH` | `~/.global-agent-memory.db` | Path to the SQLite database file. Useful if you want to isolate memories per machine or project. |
 | `MCP_TRANSPORT` | `stdio` | Set to `http` to start the server in HTTP/SSE mode instead of stdio. |
 | `MCP_PORT` | `3456` | Port to listen on when using HTTP mode. |
-| `MTMEM_W_SIM` | `0.6` | Weight given to cosine similarity in the ranking score. |
-| `MTMEM_W_IMP` | `0.25` | Weight given to memory importance in the ranking score. |
-| `MTMEM_W_REC` | `0.15` | Weight given to recency decay in the ranking score. |
-| `MTMEM_DECAY_LAMBDA` | `0.01` | Decay rate for recency. Higher values cause older memories to fall in rank faster. |
+| `ENGRAMDB_W_SIM` | `0.6` | Weight given to cosine similarity in the ranking score. |
+| `ENGRAMDB_W_IMP` | `0.25` | Weight given to memory importance in the ranking score. |
+| `ENGRAMDB_W_REC` | `0.15` | Weight given to recency decay in the ranking score. |
+| `ENGRAMDB_DECAY_LAMBDA` | `0.01` | Decay rate for recency. Higher values cause older memories to fall in rank faster. |
 
-The three scoring weights (`MTMEM_W_SIM`, `MTMEM_W_IMP`, `MTMEM_W_REC`) should sum to 1.0 for predictable score ranges, but this is not enforced.
+The three scoring weights (`ENGRAMDB_W_SIM`, `ENGRAMDB_W_IMP`, `ENGRAMDB_W_REC`) should sum to 1.0 for predictable score ranges, but this is not enforced.
 
 ---
 
 ## HTTP/SSE transport
 
-By default `mtmem` communicates over stdio, which is the right choice for local desktop clients. If you want to run `mtmem` as a shared service on a server (for example, to share a memory store across multiple machines or containers), you can switch to HTTP/SSE transport.
+By default `engramdb` communicates over stdio, which is the right choice for local desktop clients. If you want to run `engramdb` as a shared service on a server (for example, to share a memory store across multiple machines or containers), you can switch to HTTP/SSE transport.
 
 Start the server in HTTP mode:
 
 ```bash
-MCP_TRANSPORT=http mtmem
+MCP_TRANSPORT=http engramdb
 # or
-mtmem --http
+engramdb --http
 ```
 
 Output:
 
 ```
-[mtmem] MCP server listening on http://localhost:3456/sse
+[engramdb] MCP server listening on http://localhost:3456/sse
 ```
 
 You can then connect any MCP client that supports SSE transport to `http://localhost:3456/sse`.
@@ -458,8 +458,8 @@ You should see the SSE stream open and stay connected. MCP messages are sent as 
 ## Development
 
 ```bash
-git clone https://github.com/your-org/mtmem.git
-cd mtmem
+git clone https://github.com/your-org/engramdb.git
+cd engramdb
 npm install
 ```
 
@@ -483,7 +483,7 @@ To run directly from source during development:
 node --loader ts-node/esm src/index.ts
 ```
 
-Or link it globally so you can use the `mtmem` command against your local build:
+Or link it globally so you can use the `engramdb` command against your local build:
 
 ```bash
 npm run build && npm link

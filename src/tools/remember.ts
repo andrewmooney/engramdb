@@ -13,7 +13,7 @@ export async function handleRemember(
   const importance = Math.max(0, Math.min(1, input.importance ?? 0.5));
   const embedding = await embed(input.content).catch((err: unknown) => {
     const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(`[mtmem] Embedding failed: ${msg}`);
+    throw new Error(`[engramdb] Embedding failed: ${msg}`);
   });
   return insertMemory(db, { ...input, importance, embedding });
 }
