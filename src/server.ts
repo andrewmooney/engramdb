@@ -23,7 +23,7 @@ const MEMORY_TYPES = ['fact', 'code_pattern', 'preference', 'decision', 'task', 
 const TURN_ROLES = ['user', 'assistant', 'tool'] as const;
 
 export function createServer(db: Database.Database): McpServer {
-  const server = new McpServer({ name: 'engramdb', version: '0.1.0' });
+  const server = new McpServer({ name: 'engramdb', version: '0.2.0' });
 
   server.tool(
     'remember_memory',
