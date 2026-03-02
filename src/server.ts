@@ -6,6 +6,7 @@ import { handleRecall } from './tools/recall.js';
 import { handleSearchGlobal } from './tools/search-global.js';
 import { handleUpdate } from './tools/update.js';
 import { handleListProjects } from './tools/list-projects.js';
+import { handleDeleteMemory } from './tools/delete-memory.js';
 import { handleStartConversation } from './tools/start-conversation.js';
 import { handleAppendTurn } from './tools/append-turn.js';
 import { handleCloseConversation } from './tools/close-conversation.js';
@@ -108,6 +109,23 @@ export function createServer(db: Database.Database): McpServer {
     () => {
       try {
         const result = handleListProjects(db);
+        return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { content: [{ type: 'text', text: msg }], isError: true };
+      }
+    }
+  );
+
+  server.tool(
+    'delete_memory',
+    'Delete a memory by id',
+    {
+      id: z.string().uuid(),
+    },
+    (input) => {
+      try {
+        const result = handleDeleteMemory(db, input);
         return { content: [{ type: 'text', text: JSON.stringify(result) }] };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

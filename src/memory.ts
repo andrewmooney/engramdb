@@ -160,3 +160,21 @@ export function listProjects(db: Database.Database) {
     ORDER BY last_updated_at DESC
   `).all() as { project_id: string; memory_count: number; last_updated_at: number }[];
 }
+
+export function deleteMemory(
+  db: Database.Database,
+  id: string
+): { deleted: boolean; id: string } {
+  const existing = db.prepare('SELECT id FROM memories WHERE id = ?').get(id);
+  if (!existing) throw new Error(`Memory not found: ${id}`);
+
+  const doDelete = db.transaction(() => {
+    // memory_embeddings is a vec0 virtual table that does not support FK constraints;
+    // must be deleted first, before the memories row.
+    db.prepare('DELETE FROM memory_embeddings WHERE id = ?').run(id);
+    db.prepare('DELETE FROM memories WHERE id = ?').run(id);
+  });
+  doDelete();
+
+  return { deleted: true, id };
+}

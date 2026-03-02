@@ -129,3 +129,32 @@ describe('list_projects tool', () => {
     expect(projects[0].memory_count).toBe(1);
   });
 });
+
+describe('delete_memory tool', () => {
+  it('deletes an existing memory by id', async () => {
+    const { handleRemember } = await import('../src/tools/remember.js');
+    const { handleDeleteMemory } = await import('../src/tools/delete-memory.js');
+    const { id } = await handleRemember(db, {
+      project_id: '/p', agent_id: 'a', type: 'fact', content: 'to delete', importance: 0.5,
+    });
+    const result = handleDeleteMemory(db, { id });
+    expect(result.deleted).toBe(true);
+  });
+
+  it('throws for unknown id', async () => {
+    const { handleDeleteMemory } = await import('../src/tools/delete-memory.js');
+    expect(() => handleDeleteMemory(db, { id: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx' }))
+      .toThrow('Memory not found');
+  });
+
+  it('memory is gone after deletion', async () => {
+    const { handleRemember } = await import('../src/tools/remember.js');
+    const { handleDeleteMemory } = await import('../src/tools/delete-memory.js');
+    const { id } = await handleRemember(db, {
+      project_id: '/p', agent_id: 'a', type: 'fact', content: 'to delete', importance: 0.5,
+    });
+    handleDeleteMemory(db, { id });
+    const row = db.prepare('SELECT id FROM memories WHERE id = ?').get(id);
+    expect(row).toBeUndefined();
+  });
+});
