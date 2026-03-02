@@ -203,12 +203,13 @@ export function deleteMemory(
 
 export function listMemories(
   db: Database.Database,
-  params: { project_id: string; type?: MemoryType; limit?: number }
+  params: { project_id: string; type?: MemoryType; agent_id?: string; limit?: number }
 ): Memory[] {
   let query = 'SELECT * FROM memories WHERE project_id = ?';
   const args: unknown[] = [params.project_id];
 
-  if (params.type) { query += ' AND type = ?'; args.push(params.type); }
+  if (params.type)     { query += ' AND type = ?';     args.push(params.type); }
+  if (params.agent_id) { query += ' AND agent_id = ?'; args.push(params.agent_id); }
   query += ' ORDER BY updated_at DESC';
   if (params.limit != null) { query += ' LIMIT ?'; args.push(params.limit); }
 

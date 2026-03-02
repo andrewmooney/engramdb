@@ -4,7 +4,7 @@ import { listMemories } from '../memory.js';
 
 export function handleListMemories(
   db: Database.Database,
-  input: { project_id: string; type?: MemoryType; limit?: number }
+  input: { project_id: string; type?: MemoryType; agent_id?: string; limit?: number }
 ): Memory[] {
   return listMemories(db, input);
 }

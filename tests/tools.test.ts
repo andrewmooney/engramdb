@@ -240,6 +240,57 @@ describe('get_memory tool', () => {
   });
 });
 
+describe('list_memories agent_id filter', () => {
+  it('filters by agent_id when provided', async () => {
+    const { handleRemember } = await import('../src/tools/remember.js');
+    const { handleListMemories } = await import('../src/tools/list-memories.js');
+    await handleRemember(db, { project_id: '/p', agent_id: 'claude', type: 'fact', content: 'from claude', importance: 0.5 });
+    await handleRemember(db, { project_id: '/p', agent_id: 'gpt', type: 'fact', content: 'from gpt', importance: 0.5 });
+    const results = handleListMemories(db, { project_id: '/p', agent_id: 'claude' });
+    expect(results).toHaveLength(1);
+    expect(results[0].agent_id).toBe('claude');
+  });
+});
+
+describe('remember_many tool', () => {
+  it('inserts multiple memories and returns ids', async () => {
+    const { handleRememberMany } = await import('../src/tools/remember-many.js');
+    const results = await handleRememberMany(db, {
+      project_id: '/p',
+      agent_id: 'a',
+      memories: [
+        { type: 'fact', content: 'item one', importance: 0.5 },
+        { type: 'decision', content: 'item two', importance: 0.8 },
+      ],
+    });
+    expect(results).toHaveLength(2);
+    expect(results[0].id).toBeTruthy();
+    expect(results[1].id).toBeTruthy();
+  });
+
+  it('deduplicates by content within the batch', async () => {
+    const { handleRememberMany } = await import('../src/tools/remember-many.js');
+    const { handleListMemories } = await import('../src/tools/list-memories.js');
+    await handleRememberMany(db, {
+      project_id: '/p',
+      agent_id: 'a',
+      memories: [
+        { type: 'fact', content: 'duplicate', importance: 0.4 },
+        { type: 'fact', content: 'duplicate', importance: 0.9 },
+      ],
+    });
+    const mems = handleListMemories(db, { project_id: '/p' });
+    expect(mems).toHaveLength(1);
+    expect(mems[0].importance).toBeCloseTo(0.9);
+  });
+
+  it('throws for empty memories array', async () => {
+    const { handleRememberMany } = await import('../src/tools/remember-many.js');
+    await expect(handleRememberMany(db, { project_id: '/p', agent_id: 'a', memories: [] }))
+      .rejects.toThrow('memories must not be empty');
+  });
+});
+
 describe('list_memories tool', () => {
   it('lists all memories for a project', async () => {
     const { handleRemember } = await import('../src/tools/remember.js')

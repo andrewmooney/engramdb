@@ -17,6 +17,7 @@ import { handleSearchConversations } from './tools/search-conversations.js';
 import { handleGetMemory } from './tools/get-memory.js';
 import { handleListConversations } from './tools/list-conversations.js';
 import { handleDeleteConversation } from './tools/delete-conversation.js';
+import { handleRememberMany } from './tools/remember-many.js';
 
 const MEMORY_TYPES = ['fact', 'code_pattern', 'preference', 'decision', 'task', 'observation'] as const;
 const TURN_ROLES = ['user', 'assistant', 'tool'] as const;
@@ -37,6 +38,29 @@ export function createServer(db: Database.Database): McpServer {
     async ({ project_id, agent_id, type, content, importance }) => {
       try {
         const result = await handleRemember(db, { project_id, agent_id, type, content, importance });
+        return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { content: [{ type: 'text', text: msg }], isError: true };
+      }
+    }
+  );
+
+  server.tool(
+    'remember_many',
+    'Bulk store multiple memories for a project in one call',
+    {
+      project_id: z.string().min(1),
+      agent_id: z.string().min(1),
+      memories: z.array(z.object({
+        type: z.enum(MEMORY_TYPES),
+        content: z.string().min(1),
+        importance: z.number().min(0).max(1).optional(),
+      })).min(1).max(50),
+    },
+    async (input) => {
+      try {
+        const result = await handleRememberMany(db, input);
         return { content: [{ type: 'text', text: JSON.stringify(result) }] };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -128,6 +152,7 @@ export function createServer(db: Database.Database): McpServer {
     {
       project_id: z.string().min(1),
       type: z.enum(MEMORY_TYPES).optional(),
+      agent_id: z.string().min(1).optional(),
       limit: z.number().int().min(1).max(500).optional(),
     },
     (input) => {
