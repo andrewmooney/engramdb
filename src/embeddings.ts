@@ -17,9 +17,9 @@ export function getEmbedder(): Promise<FeatureExtractionPipeline> {
   return embedderPromise;
 }
 
-export async function embed(text: string): Promise<Float32Array> {
+export async function embed(text: string, prefix = ''): Promise<Float32Array> {
   const pipe = await getEmbedder();
-  const output = await pipe(text, { pooling: 'mean', normalize: true });
+  const output = await pipe(prefix + text, { pooling: 'mean', normalize: true });
   const data = output.data;
   if (!(data instanceof Float32Array)) {
     throw new Error(`[engramdb] Expected Float32Array from embedder, got ${(data as unknown as { constructor: { name: string } }).constructor.name}`);
@@ -27,6 +27,22 @@ export async function embed(text: string): Promise<Float32Array> {
   return data;
 }
 
+/** Embeds text and wraps any error with an [engramdb] prefix. Use instead of embed().catch(...) inline. */
+export async function embedOrThrow(text: string, prefix = ''): Promise<Float32Array> {
+  return embed(text, prefix).catch((err: unknown) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`[engramdb] Embedding failed: ${msg}`);
+  });
+}
+
 export function disposeEmbedder(): void {
+  if (embedderPromise) {
+    // Attempt to dispose ONNX session if the pipeline exposes it
+    embedderPromise.then((pipe) => {
+      if (typeof (pipe as unknown as { dispose?: () => void }).dispose === 'function') {
+        (pipe as unknown as { dispose: () => void }).dispose();
+      }
+    }).catch(() => { /* ignore dispose errors */ });
+  }
   embedderPromise = null;
 }

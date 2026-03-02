@@ -4,6 +4,7 @@ import type Database from 'better-sqlite3';
 
 vi.mock('../src/embeddings.js', () => ({
   embed: vi.fn().mockResolvedValue(new Float32Array(768).fill(0.1)),
+  embedOrThrow: vi.fn().mockResolvedValue(new Float32Array(768).fill(0.1)),
 }));
 
 let db: Database.Database;

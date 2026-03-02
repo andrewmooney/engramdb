@@ -16,3 +16,23 @@ describe('embed', () => {
     expect(result.length).toBe(768);
   });
 });
+
+describe('embedOrThrow', () => {
+  it('is exported from embeddings.ts', async () => {
+    const mod = await import('../src/embeddings.js');
+    expect(typeof mod.embedOrThrow).toBe('function');
+  });
+
+  it('returns a Float32Array on success', async () => {
+    const { embedOrThrow } = await import('../src/embeddings.js');
+    const result = await embedOrThrow('hello world');
+    expect(result).toBeInstanceOf(Float32Array);
+  });
+});
+
+describe('disposeEmbedder', () => {
+  it('is callable without throwing', async () => {
+    const { disposeEmbedder } = await import('../src/embeddings.js');
+    expect(() => disposeEmbedder()).not.toThrow();
+  });
+});
