@@ -80,14 +80,16 @@ export function queryMemories(
 ): MemoryWithScore[] {
   const now = Date.now();
 
-  // Get top candidates from vector search (2x limit for re-scoring)
+  // Oversample for re-scoring: 5x when filters are active (reduces post-filter miss rate)
+  const hasFilter = !!(params.project_id || params.agent_id || params.type);
+  const oversample = params.limit * (hasFilter ? 5 : 2);
   const candidates = db.prepare(`
     SELECT id, distance
     FROM memory_embeddings
     WHERE embedding MATCH ?
     AND k = ?
     ORDER BY distance
-  `).all(params.embedding, params.limit * 2) as { id: string; distance: number }[];
+  `).all(params.embedding, oversample) as { id: string; distance: number }[];
 
   if (candidates.length === 0) return [];
 

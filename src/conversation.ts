@@ -92,13 +92,14 @@ export function queryConversations(
 ): ConversationWithScore[] {
   const now = Date.now();
 
+  const oversample = params.limit * (params.project_id ? 5 : 2);
   const candidates = db.prepare(`
     SELECT id, distance
     FROM conversation_embeddings
     WHERE embedding MATCH ?
     AND k = ?
     ORDER BY distance
-  `).all(params.embedding, params.limit * 2) as { id: string; distance: number }[];
+  `).all(params.embedding, oversample) as { id: string; distance: number }[];
 
   if (candidates.length === 0) return [];
 
