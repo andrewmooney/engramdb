@@ -231,3 +231,40 @@ export function deleteProject(
 
   return { project_id, deleted_count: count };
 }
+
+/**
+ * Insert a memory, or update importance/updated_at if a memory with identical
+ * (project_id, content) already exists. Returns the id (existing or new) and created_at.
+ */
+export function upsertMemory(
+  db: Database.Database,
+  params: {
+    project_id: string;
+    agent_id: string;
+    type: MemoryType;
+    content: string;
+    importance: number;
+    embedding: Float32Array;
+  }
+): { id: string; created_at: number } {
+  const importance = Math.max(0, Math.min(1, params.importance));
+
+  const existing = db.prepare(
+    'SELECT id, created_at FROM memories WHERE project_id = ? AND content = ? LIMIT 1'
+  ).get(params.project_id, params.content) as { id: string; created_at: number } | undefined;
+
+  if (existing) {
+    const now = Date.now();
+    db.transaction(() => {
+      db.prepare(
+        'UPDATE memories SET importance = ?, updated_at = ? WHERE id = ?'
+      ).run(importance, now, existing.id);
+      db.prepare(
+        'UPDATE memory_embeddings SET embedding = ? WHERE id = ?'
+      ).run(params.embedding, existing.id);
+    })();
+    return { id: existing.id, created_at: existing.created_at };
+  }
+
+  return insertMemory(db, { ...params, importance });
+}

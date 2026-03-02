@@ -1,7 +1,7 @@
 import type Database from 'better-sqlite3';
 import type { MemoryType } from '../types.js';
 import { embedOrThrow } from '../embeddings.js';
-import { insertMemory } from '../memory.js';
+import { upsertMemory } from '../memory.js';
 
 export async function handleRemember(
   db: Database.Database,
@@ -12,5 +12,5 @@ export async function handleRemember(
   if (!input.agent_id?.trim()) throw new Error('agent_id is required and must not be empty');
   const importance = Math.max(0, Math.min(1, input.importance ?? 0.5));
   const embedding = await embedOrThrow(input.content, 'search_document: ');
-  return insertMemory(db, { ...input, importance, embedding });
+  return upsertMemory(db, { ...input, importance, embedding });
 }

@@ -194,6 +194,34 @@ describe('delete_project tool', () => {
   })
 })
 
+describe('remember_memory deduplication (upsert)', () => {
+  it('returns the same id for identical content in the same project', async () => {
+    const { handleRemember } = await import('../src/tools/remember.js');
+    const r1 = await handleRemember(db, { project_id: '/p', agent_id: 'a', type: 'fact', content: 'exact same', importance: 0.5 });
+    const r2 = await handleRemember(db, { project_id: '/p', agent_id: 'a', type: 'fact', content: 'exact same', importance: 0.8 });
+    expect(r1.id).toBe(r2.id);
+  });
+
+  it('updates importance when upserting', async () => {
+    const { handleRemember } = await import('../src/tools/remember.js');
+    const { handleListMemories } = await import('../src/tools/list-memories.js');
+    await handleRemember(db, { project_id: '/p', agent_id: 'a', type: 'fact', content: 'dedup test', importance: 0.3 });
+    await handleRemember(db, { project_id: '/p', agent_id: 'a', type: 'fact', content: 'dedup test', importance: 0.9 });
+    const mems = handleListMemories(db, { project_id: '/p' });
+    expect(mems).toHaveLength(1);
+    expect(mems[0].importance).toBeCloseTo(0.9);
+  });
+
+  it('allows same content in different projects', async () => {
+    const { handleRemember } = await import('../src/tools/remember.js');
+    const { handleListProjects } = await import('../src/tools/list-projects.js');
+    await handleRemember(db, { project_id: '/projA', agent_id: 'a', type: 'fact', content: 'shared fact', importance: 0.5 });
+    await handleRemember(db, { project_id: '/projB', agent_id: 'a', type: 'fact', content: 'shared fact', importance: 0.5 });
+    const projects = handleListProjects(db);
+    expect(projects).toHaveLength(2);
+  });
+});
+
 describe('list_memories tool', () => {
   it('lists all memories for a project', async () => {
     const { handleRemember } = await import('../src/tools/remember.js')
