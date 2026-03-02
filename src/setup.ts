@@ -20,6 +20,8 @@ import { $ } from "bun"
 import path from "path"
 
 const conversationMap = new Map<string, string>()
+// Tracks the index (exclusive) of the last message we've already appended per session.
+// On session.status (idle) we append all messages from this index onwards.
 const lastAppendedIndexMap = new Map<string, number>()
 let rpcId = 0
 
@@ -96,6 +98,8 @@ export const EngramdbPlugin: Plugin = async ({ client, directory }) => {
             if (appended > 0) {
               await client.app.log({ body: { service: "engramdb-plugin", level: "debug", message: \`session.status: \${appended} turn(s) appended\`, extra: { sessionID, appended } } })
             }
+            // Always advance the watermark so re-scanned messages (empty content, non-user/assistant role)
+            // don't accumulate — they won't be retried on subsequent idle events.
             lastAppendedIndexMap.set(sessionID, startIdx + unsaved.length)
           } catch (err) {
             await client.app.log({ body: { service: "engramdb-plugin", level: "warn", message: "session.status: append_turn failed", extra: { error: String(err), sessionID } } })
@@ -103,7 +107,7 @@ export const EngramdbPlugin: Plugin = async ({ client, directory }) => {
         } else if (event.type === "session.deleted") {
           const sessionId = (event.properties as { info?: { id?: string } })?.info?.id
           if (!sessionId) return
-          const conversationId = conversationMap.get(sessionId)
+          const conversationId = await getOrCreateConversation(sessionId, projectId, agentId)
           if (!conversationId) return
           try {
             const messages = await client.session.messages({ path: { id: sessionId } })
