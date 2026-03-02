@@ -20,8 +20,6 @@ import { $ } from "bun"
 import path from "path"
 
 const conversationMap = new Map<string, string>()
-// Tracks the index (exclusive) of the last message we've already appended per session.
-// On session.status (idle) we append all messages from this index onwards.
 const lastAppendedIndexMap = new Map<string, number>()
 let rpcId = 0
 
@@ -37,6 +35,29 @@ async function callMtmem(toolName: string, args: Record<string, unknown>): Promi
   return result
 }
 
+async function getOrCreateConversation(
+  sessionId: string,
+  projectId: string,
+  agentId: string,
+): Promise<string | null> {
+  const existing = conversationMap.get(sessionId)
+  if (existing) return existing
+
+  const title = \`OpenCode session \${new Date().toISOString()}\`
+  const convResult = await callMtmem("start_conversation", {
+    project_id: projectId,
+    agent_id: agentId,
+    title,
+  }) as { result?: { content?: Array<{ text?: string }> } }
+  const text = convResult?.result?.content?.[0]?.text ?? "{}"
+  const parsed = JSON.parse(text) as { id?: string }
+  if (parsed.id) {
+    conversationMap.set(sessionId, parsed.id)
+    return parsed.id
+  }
+  return null
+}
+
 export const EngramdbPlugin: Plugin = async ({ client, directory }) => {
   const projectId = path.basename(directory)
   const agentId = "opencode"
@@ -47,22 +68,16 @@ export const EngramdbPlugin: Plugin = async ({ client, directory }) => {
         if (event.type === "session.created") {
           const sessionId = (event.properties as { info?: { id?: string } })?.info?.id
           if (!sessionId) return
-          const title = \`OpenCode session \${new Date().toISOString()}\`
-          const convResult = await callMtmem("start_conversation", {
-            project_id: projectId, agent_id: agentId, title,
-          }) as { result?: { content?: Array<{ text?: string }> } }
-          const text = convResult?.result?.content?.[0]?.text ?? "{}"
-          const parsed = JSON.parse(text) as { id?: string }
-          if (parsed.id) conversationMap.set(sessionId, parsed.id)
+          const conversationId = await getOrCreateConversation(sessionId, projectId, agentId)
           await callMtmem("recall_memories", { project_id: projectId, query: "recent work, decisions, patterns", limit: 10 })
           await callMtmem("search_conversations", { project_id: projectId, query: "recent sessions", limit: 3 })
-          await client.app.log({ body: { service: "engramdb-plugin", level: "info", message: "session.created: conversation opened", extra: { sessionId, conversationId: parsed.id } } })
+          await client.app.log({ body: { service: "engramdb-plugin", level: "info", message: "session.created: conversation opened", extra: { sessionId, conversationId } } })
         } else if (event.type === "session.status") {
           const props = event.properties as { sessionID?: string; status?: { type?: string } }
           if (props.status?.type !== "idle") return
           const sessionID = props.sessionID
           if (!sessionID) return
-          const conversationId = conversationMap.get(sessionID)
+          const conversationId = await getOrCreateConversation(sessionID, projectId, agentId)
           if (!conversationId) return
           try {
             const messages = await client.session.messages({ path: { id: sessionID } })
@@ -81,8 +96,6 @@ export const EngramdbPlugin: Plugin = async ({ client, directory }) => {
             if (appended > 0) {
               await client.app.log({ body: { service: "engramdb-plugin", level: "debug", message: \`session.status: \${appended} turn(s) appended\`, extra: { sessionID, appended } } })
             }
-            // Always advance the watermark so re-scanned messages (empty content, non-user/assistant role)
-            // don't accumulate — they won't be retried on subsequent idle events.
             lastAppendedIndexMap.set(sessionID, startIdx + unsaved.length)
           } catch (err) {
             await client.app.log({ body: { service: "engramdb-plugin", level: "warn", message: "session.status: append_turn failed", extra: { error: String(err), sessionID } } })
