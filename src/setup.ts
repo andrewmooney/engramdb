@@ -21,7 +21,7 @@ import path from "path"
 
 const conversationMap = new Map<string, string>()
 // Tracks the index (exclusive) of the last message we've already appended per session.
-// On session.idle we append all messages from this index onwards.
+// On session.status (idle) we append all messages from this index onwards.
 const lastAppendedIndexMap = new Map<string, number>()
 let rpcId = 0
 
@@ -57,8 +57,10 @@ export const EngramdbPlugin: Plugin = async ({ client, directory }) => {
           await callMtmem("recall_memories", { project_id: projectId, query: "recent work, decisions, patterns", limit: 10 })
           await callMtmem("search_conversations", { project_id: projectId, query: "recent sessions", limit: 3 })
           await client.app.log({ body: { service: "engramdb-plugin", level: "info", message: "session.created: conversation opened", extra: { sessionId, conversationId: parsed.id } } })
-        } else if (event.type === "session.idle") {
-          const sessionID = (event.properties as { sessionID?: string }).sessionID
+        } else if (event.type === "session.status") {
+          const props = event.properties as { sessionID?: string; status?: { type?: string } }
+          if (props.status?.type !== "idle") return
+          const sessionID = props.sessionID
           if (!sessionID) return
           const conversationId = conversationMap.get(sessionID)
           if (!conversationId) return
@@ -77,11 +79,13 @@ export const EngramdbPlugin: Plugin = async ({ client, directory }) => {
               appended++
             }
             if (appended > 0) {
-              lastAppendedIndexMap.set(sessionID, startIdx + unsaved.length)
-              await client.app.log({ body: { service: "engramdb-plugin", level: "debug", message: \`session.idle: \${appended} turn(s) appended\`, extra: { sessionID, appended } } })
+              await client.app.log({ body: { service: "engramdb-plugin", level: "debug", message: \`session.status: \${appended} turn(s) appended\`, extra: { sessionID, appended } } })
             }
+            // Always advance the watermark so re-scanned messages (empty content, non-user/assistant role)
+            // don't accumulate — they won't be retried on subsequent idle events.
+            lastAppendedIndexMap.set(sessionID, startIdx + unsaved.length)
           } catch (err) {
-            await client.app.log({ body: { service: "engramdb-plugin", level: "warn", message: "session.idle: append_turn failed", extra: { error: String(err), sessionID } } })
+            await client.app.log({ body: { service: "engramdb-plugin", level: "warn", message: "session.status: append_turn failed", extra: { error: String(err), sessionID } } })
           }
         } else if (event.type === "session.deleted") {
           const sessionId = (event.properties as { info?: { id?: string } })?.info?.id

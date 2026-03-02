@@ -229,6 +229,12 @@ it('OPENCODE_PLUGIN_SOURCE uses index-based dedup (lastAppendedIndexMap)', async
   expect(OPENCODE_PLUGIN_SOURCE).not.toContain('lastAppendedMap')
 })
 
+it('OPENCODE_PLUGIN_SOURCE uses session.status instead of session.idle', async () => {
+  const { OPENCODE_PLUGIN_SOURCE } = await import('./setup.js')
+  expect(OPENCODE_PLUGIN_SOURCE).toContain('session.status')
+  expect(OPENCODE_PLUGIN_SOURCE).not.toContain('session.idle')
+})
+
 it('Claude Desktop: detected but no files written', async () => {
   const home = await mkdtemp(join(tmpdir(), 'engramdb-setup-test-'))
   const cwd = await mkdtemp(join(tmpdir(), 'engramdb-setup-cwd-'))
