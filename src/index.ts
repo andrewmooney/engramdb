@@ -5,11 +5,11 @@ if (process.argv[2] === 'setup') {
   process.exit(0)
 }
 
-import { VERSION } from './version.js';
+import { VERSION } from './version.js'
 
 if (process.argv.includes('--version') || process.argv.includes('-v')) {
-  process.stdout.write(VERSION + '\n');
-  process.exit(0);
+  process.stdout.write(VERSION + '\n')
+  process.exit(0)
 }
 
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
