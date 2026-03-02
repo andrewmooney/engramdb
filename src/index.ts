@@ -4,6 +4,14 @@ if (process.argv[2] === 'setup') {
   await runSetup()
   process.exit(0)
 }
+
+import { VERSION } from './version.js';
+
+if (process.argv.includes('--version') || process.argv.includes('-v')) {
+  process.stdout.write(VERSION + '\n');
+  process.exit(0);
+}
+
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import express from 'express';
