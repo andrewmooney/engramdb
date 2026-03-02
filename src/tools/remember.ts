@@ -11,6 +11,6 @@ export async function handleRemember(
   if (!input.content?.trim()) throw new Error('content is required and must not be empty');
   if (!input.agent_id?.trim()) throw new Error('agent_id is required and must not be empty');
   const importance = Math.max(0, Math.min(1, input.importance ?? 0.5));
-  const embedding = await embedOrThrow(input.content);
+  const embedding = await embedOrThrow(input.content, 'search_document: ');
   return insertMemory(db, { ...input, importance, embedding });
 }

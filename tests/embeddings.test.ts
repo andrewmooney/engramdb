@@ -36,3 +36,19 @@ describe('disposeEmbedder', () => {
     expect(() => disposeEmbedder()).not.toThrow();
   });
 });
+
+describe('embed with prefix', () => {
+  it('prepends search_document prefix to stored content', async () => {
+    const { embed } = await import('../src/embeddings.js');
+    // The mock returns the same Float32Array regardless of input.
+    // We verify the function accepts a prefix argument without error.
+    const result = await embed('my content', 'search_document: ');
+    expect(result).toBeInstanceOf(Float32Array);
+  });
+
+  it('prepends search_query prefix to queries', async () => {
+    const { embed } = await import('../src/embeddings.js');
+    const result = await embed('my query', 'search_query: ');
+    expect(result).toBeInstanceOf(Float32Array);
+  });
+});

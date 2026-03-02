@@ -7,7 +7,7 @@ export async function handleSearchConversations(
   input: { query: string; project_id?: string; limit?: number }
 ) {
   if (!input.query?.trim()) throw new Error('query is required');
-  const embedding = await embedOrThrow(input.query);
+  const embedding = await embedOrThrow(input.query, 'search_query: ');
   return queryConversations(db, {
     embedding,
     project_id: input.project_id,

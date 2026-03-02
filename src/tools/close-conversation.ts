@@ -9,7 +9,7 @@ export async function handleCloseConversation(
   if (!input.conversation_id?.trim()) throw new Error('conversation_id is required');
   if (!input.summary?.trim()) throw new Error('summary is required');
 
-  const embedding = await embedOrThrow(input.summary);
+  const embedding = await embedOrThrow(input.summary, 'search_document: ');
 
   closeConversation(db, { ...input, embedding });
   return { message: 'Conversation closed.' };

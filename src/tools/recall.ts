@@ -8,7 +8,7 @@ export async function handleRecall(
   input: { project_id: string; query: string; limit?: number; type?: MemoryType; agent_id?: string }
 ) {
   if (!input.query?.trim()) throw new Error('query is required and must not be empty');
-  const embedding = await embedOrThrow(input.query);
+  const embedding = await embedOrThrow(input.query, 'search_query: ');
   return queryMemories(db, {
     embedding,
     project_id: input.project_id,
