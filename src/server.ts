@@ -18,12 +18,13 @@ import { handleGetMemory } from './tools/get-memory.js';
 import { handleListConversations } from './tools/list-conversations.js';
 import { handleDeleteConversation } from './tools/delete-conversation.js';
 import { handleRememberMany } from './tools/remember-many.js';
+import { VERSION } from './version.js';
 
 const MEMORY_TYPES = ['fact', 'code_pattern', 'preference', 'decision', 'task', 'observation'] as const;
 const TURN_ROLES = ['user', 'assistant', 'tool'] as const;
 
 export function createServer(db: Database.Database): McpServer {
-  const server = new McpServer({ name: 'engramdb', version: '0.2.0' });
+  const server = new McpServer({ name: 'engramdb', version: VERSION });
 
   server.tool(
     'remember_memory',
@@ -339,6 +340,15 @@ export function createServer(db: Database.Database): McpServer {
         const msg = err instanceof Error ? err.message : String(err);
         return { content: [{ type: 'text', text: msg }], isError: true };
       }
+    }
+  );
+
+  server.tool(
+    'get_version',
+    'Get the currently running version of engramdb',
+    {},
+    () => {
+      return { content: [{ type: 'text', text: JSON.stringify({ version: VERSION }) }] };
     }
   );
 
