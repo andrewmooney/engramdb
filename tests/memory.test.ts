@@ -163,3 +163,24 @@ describe('insertMemory importance clamp', () => {
     expect(row.importance).toBe(0);
   });
 });
+
+describe('queryMemories access_count batched update', () => {
+  let db: Database.Database;
+  beforeEach(() => { db = createDb(':memory:'); });
+
+  it('increments access_count for all returned results in a single query', () => {
+    // Insert 3 memories
+    for (let i = 0; i < 3; i++) {
+      insertMemory(db, {
+        project_id: '/p', agent_id: 'a', type: 'fact',
+        content: `memory ${i}`, importance: 0.5,
+        embedding: new Float32Array(768).fill(0.1),
+      });
+    }
+    // Query them
+    queryMemories(db, { embedding: new Float32Array(768).fill(0.1), limit: 10 });
+    // All 3 should have access_count = 1
+    const rows = db.prepare('SELECT access_count FROM memories WHERE project_id = ?').all('/p') as { access_count: number }[];
+    expect(rows.every(r => r.access_count === 1)).toBe(true);
+  });
+});

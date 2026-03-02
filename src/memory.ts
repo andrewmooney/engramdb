@@ -119,11 +119,15 @@ export function queryMemories(
   scored.sort((a, b) => b.score - a.score);
   const top = scored.slice(0, params.limit);
 
-  // Update access metadata
-  const updateStmt = db.prepare(`
-    UPDATE memories SET last_accessed_at = ?, access_count = access_count + 1 WHERE id = ?
-  `);
-  for (const m of top) updateStmt.run(now, m.id);
+  // Batch-update access metadata in a single statement
+  if (top.length > 0) {
+    const placeholders = top.map(() => '?').join(',');
+    db.transaction(() => {
+      (db.prepare(
+        `UPDATE memories SET last_accessed_at = ?, access_count = access_count + 1 WHERE id IN (${placeholders})`
+      ).run as (...a: unknown[]) => void)(now, ...top.map(m => m.id));
+    })();
+  }
 
   return top;
 }
