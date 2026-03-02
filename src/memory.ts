@@ -7,6 +7,15 @@ const W_IMP    = parseFloat(process.env.ENGRAMDB_W_IMP    ?? '') || 0.25;
 const W_REC    = parseFloat(process.env.ENGRAMDB_W_REC    ?? '') || 0.15;
 const LAMBDA   = parseFloat(process.env.ENGRAMDB_DECAY_LAMBDA ?? '') || 0.01;
 
+// Warn at startup if weights don't sum to ~1.0
+const W_SUM = W_SIM + W_IMP + W_REC;
+if (Math.abs(W_SUM - 1.0) > 0.01) {
+  process.stderr.write(
+    `[engramdb] WARNING: score weights sum to ${W_SUM.toFixed(3)}, expected ~1.0. ` +
+    `Set ENGRAMDB_W_SIM + ENGRAMDB_W_IMP + ENGRAMDB_W_REC ≈ 1.0\n`
+  );
+}
+
 export function recencyDecay(lastAccessedAt: number, now: number): number {
   const daysSince = (now - lastAccessedAt) / (1000 * 60 * 60 * 24);
   return Math.exp(-LAMBDA * daysSince);
@@ -39,6 +48,7 @@ export function insertMemory(
 ): { id: string; created_at: number } {
   const id = uuidv4();
   const now = Date.now();
+  const importance = Math.max(0, Math.min(1, params.importance));
 
   const doInsert = db.transaction(() => {
     db.prepare(`
@@ -46,7 +56,7 @@ export function insertMemory(
                             access_count, created_at, updated_at, last_accessed_at)
       VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
     `).run(id, params.project_id, params.agent_id, params.type, params.content,
-           params.importance, now, now, now);
+           importance, now, now, now);
 
     db.prepare(`
       INSERT INTO memory_embeddings (id, embedding) VALUES (?, ?)

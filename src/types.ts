@@ -50,6 +50,6 @@ export interface ConversationTurn {
 }
 
 export interface ConversationWithScore extends Conversation {
-  /** Weighted composite score: 0.6×similarity + 0.25×importance + 0.15×recency. Higher is better. Range: [0, ~1]. */
+  /** Weighted composite score: 0.6×similarity + 0.5×(hardcoded importance) + 0.15×recency. Importance is fixed at 0.5 for conversations; ENGRAMDB_W_IMP has no effect here. Higher is better. Range: [0, ~1]. */
   score: number;
 }

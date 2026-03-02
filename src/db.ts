@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { load } from 'sqlite-vec';
 import { homedir } from 'os';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import { mkdirSync } from 'fs';
 import { runMigrations } from './migrations/index.js';
 
@@ -9,7 +9,7 @@ export const DEFAULT_DB_PATH = process.env.ENGRAMDB_DB_PATH ?? join(homedir(), '
 
 export function createDb(path: string = DEFAULT_DB_PATH): Database.Database {
   if (path !== ':memory:') {
-    mkdirSync(join(path, '..'), { recursive: true });
+    mkdirSync(dirname(path), { recursive: true });
   }
 
   const db = new Database(path);

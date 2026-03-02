@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { computeScore, recencyDecay, insertMemory, queryMemories, updateMemory, listProjects } from '../src/memory.js';
 import { createDb } from '../src/db.js';
 import type Database from 'better-sqlite3';
+import type { MemoryType } from '../src/types.js';
 
 describe('insertMemory', () => {
   let db: Database.Database;
@@ -137,5 +138,28 @@ describe('computeScore', () => {
     const high = computeScore({ similarity: 1.0, importance: 0.5, lastAccessedAt: now, now });
     const low = computeScore({ similarity: 0.2, importance: 0.5, lastAccessedAt: now, now });
     expect(high).toBeGreaterThan(low);
+  });
+});
+
+describe('insertMemory importance clamp', () => {
+  let db: Database.Database;
+  beforeEach(() => { db = createDb(':memory:'); });
+
+  it('clamps importance > 1 to 1', () => {
+    const { id } = insertMemory(db, {
+      project_id: '/p', agent_id: 'a', type: 'fact', content: 'x',
+      importance: 1.5, embedding: new Float32Array(768).fill(0.1),
+    });
+    const row = db.prepare('SELECT importance FROM memories WHERE id = ?').get(id) as { importance: number };
+    expect(row.importance).toBe(1);
+  });
+
+  it('clamps importance < 0 to 0', () => {
+    const { id } = insertMemory(db, {
+      project_id: '/p', agent_id: 'a', type: 'fact', content: 'x',
+      importance: -0.1, embedding: new Float32Array(768).fill(0.1),
+    });
+    const row = db.prepare('SELECT importance FROM memories WHERE id = ?').get(id) as { importance: number };
+    expect(row.importance).toBe(0);
   });
 });
