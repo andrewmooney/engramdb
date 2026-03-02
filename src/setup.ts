@@ -71,6 +71,7 @@ export const EngramdbPlugin: Plugin = async ({ client, directory }) => {
           const sessionId = (event.properties as { info?: { id?: string } })?.info?.id
           if (!sessionId) return
           const conversationId = await getOrCreateConversation(sessionId, projectId, agentId)
+          if (!conversationId) return
           await callMtmem("recall_memories", { project_id: projectId, query: "recent work, decisions, patterns", limit: 10 })
           await callMtmem("search_conversations", { project_id: projectId, query: "recent sessions", limit: 3 })
           await client.app.log({ body: { service: "engramdb-plugin", level: "info", message: "session.created: conversation opened", extra: { sessionId, conversationId } } })
@@ -107,7 +108,7 @@ export const EngramdbPlugin: Plugin = async ({ client, directory }) => {
         } else if (event.type === "session.deleted") {
           const sessionId = (event.properties as { info?: { id?: string } })?.info?.id
           if (!sessionId) return
-          const conversationId = await getOrCreateConversation(sessionId, projectId, agentId)
+          const conversationId = conversationMap.get(sessionId)
           if (!conversationId) return
           try {
             const messages = await client.session.messages({ path: { id: sessionId } })
