@@ -179,6 +179,20 @@ export function deleteMemory(
   return { deleted: true, id };
 }
 
+export function listMemories(
+  db: Database.Database,
+  params: { project_id: string; type?: MemoryType; limit?: number }
+): Memory[] {
+  let query = 'SELECT * FROM memories WHERE project_id = ?';
+  const args: unknown[] = [params.project_id];
+
+  if (params.type) { query += ' AND type = ?'; args.push(params.type); }
+  query += ' ORDER BY updated_at DESC';
+  if (params.limit != null) { query += ' LIMIT ?'; args.push(params.limit); }
+
+  return (db.prepare(query).all as (...a: unknown[]) => Memory[])(...args);
+}
+
 export function deleteProject(
   db: Database.Database,
   project_id: string

@@ -192,3 +192,40 @@ describe('delete_project tool', () => {
     expect(projects[0].project_id).toBe('/projB')
   })
 })
+
+describe('list_memories tool', () => {
+  it('lists all memories for a project', async () => {
+    const { handleRemember } = await import('../src/tools/remember.js')
+    const { handleListMemories } = await import('../src/tools/list-memories.js')
+    await handleRemember(db, { project_id: '/p', agent_id: 'a', type: 'fact', content: 'mem1', importance: 0.5 })
+    await handleRemember(db, { project_id: '/p', agent_id: 'a', type: 'decision', content: 'mem2', importance: 0.8 })
+    const results = handleListMemories(db, { project_id: '/p' })
+    expect(results).toHaveLength(2)
+  })
+
+  it('filters by type', async () => {
+    const { handleRemember } = await import('../src/tools/remember.js')
+    const { handleListMemories } = await import('../src/tools/list-memories.js')
+    await handleRemember(db, { project_id: '/p', agent_id: 'a', type: 'fact', content: 'mem1', importance: 0.5 })
+    await handleRemember(db, { project_id: '/p', agent_id: 'a', type: 'decision', content: 'mem2', importance: 0.8 })
+    const results = handleListMemories(db, { project_id: '/p', type: 'fact' })
+    expect(results).toHaveLength(1)
+    expect(results[0].type).toBe('fact')
+  })
+
+  it('returns empty array for unknown project', async () => {
+    const { handleListMemories } = await import('../src/tools/list-memories.js')
+    const results = handleListMemories(db, { project_id: '/nonexistent' })
+    expect(results).toHaveLength(0)
+  })
+
+  it('respects the limit parameter', async () => {
+    const { handleRemember } = await import('../src/tools/remember.js')
+    const { handleListMemories } = await import('../src/tools/list-memories.js')
+    await handleRemember(db, { project_id: '/p', agent_id: 'a', type: 'fact', content: 'mem1', importance: 0.5 })
+    await handleRemember(db, { project_id: '/p', agent_id: 'a', type: 'fact', content: 'mem2', importance: 0.5 })
+    await handleRemember(db, { project_id: '/p', agent_id: 'a', type: 'fact', content: 'mem3', importance: 0.5 })
+    const results = handleListMemories(db, { project_id: '/p', limit: 2 })
+    expect(results).toHaveLength(2)
+  })
+})

@@ -8,6 +8,7 @@ import { handleUpdate } from './tools/update.js';
 import { handleListProjects } from './tools/list-projects.js';
 import { handleDeleteMemory } from './tools/delete-memory.js';
 import { handleDeleteProject } from './tools/delete-project.js';
+import { handleListMemories } from './tools/list-memories.js';
 import { handleStartConversation } from './tools/start-conversation.js';
 import { handleAppendTurn } from './tools/append-turn.js';
 import { handleCloseConversation } from './tools/close-conversation.js';
@@ -110,6 +111,25 @@ export function createServer(db: Database.Database): McpServer {
     () => {
       try {
         const result = handleListProjects(db);
+        return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { content: [{ type: 'text', text: msg }], isError: true };
+      }
+    }
+  );
+
+  server.tool(
+    'list_memories',
+    'List all memories for a project without semantic search',
+    {
+      project_id: z.string().min(1),
+      type: z.enum(MEMORY_TYPES).optional(),
+      limit: z.number().int().min(1).max(500).optional(),
+    },
+    (input) => {
+      try {
+        const result = handleListMemories(db, input);
         return { content: [{ type: 'text', text: JSON.stringify(result) }] };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
