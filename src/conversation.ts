@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 import { v4 as uuidv4 } from 'uuid';
-import type { Conversation, ConversationTurn, ConversationWithScore, TurnRole } from './types.js';
+import type { Conversation, ConversationTurn, ConversationWithScore, ConversationStatus, TurnRole } from './types.js';
 import { computeScore } from './memory.js';
 
 export function insertConversation(
@@ -128,4 +128,37 @@ export function queryConversations(
 
   scored.sort((a, b) => b.score - a.score);
   return scored.slice(0, params.limit);
+}
+
+export function listConversations(
+  db: Database.Database,
+  params: { project_id: string; agent_id?: string; status?: ConversationStatus; limit?: number }
+): Conversation[] {
+  let query = 'SELECT * FROM conversations WHERE project_id = ?';
+  const args: unknown[] = [params.project_id];
+
+  if (params.agent_id) { query += ' AND agent_id = ?';  args.push(params.agent_id); }
+  if (params.status)   { query += ' AND status = ?';    args.push(params.status); }
+  query += ' ORDER BY updated_at DESC';
+  if (params.limit != null) { query += ' LIMIT ?'; args.push(params.limit); }
+
+  return (db.prepare(query).all as (...a: unknown[]) => Conversation[])(...args);
+}
+
+export function deleteConversation(
+  db: Database.Database,
+  conversation_id: string
+): { deleted: boolean; conversation_id: string } {
+  const existing = db.prepare('SELECT id, status FROM conversations WHERE id = ?')
+    .get(conversation_id) as { id: string; status: string } | undefined;
+  if (!existing) throw new Error('Conversation not found');
+
+  db.transaction(() => {
+    // Delete embedding if it exists (only closed conversations have one)
+    db.prepare('DELETE FROM conversation_embeddings WHERE id = ?').run(conversation_id);
+    db.prepare('DELETE FROM conversation_turns WHERE conversation_id = ?').run(conversation_id);
+    db.prepare('DELETE FROM conversations WHERE id = ?').run(conversation_id);
+  })();
+
+  return { deleted: true, conversation_id };
 }

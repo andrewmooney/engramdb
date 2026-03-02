@@ -213,6 +213,56 @@ describe('search_conversations tool', () => {
   });
 });
 
+describe('list_conversations tool', () => {
+  it('lists all conversations for a project', async () => {
+    const { handleStartConversation } = await import('../src/tools/start-conversation.js');
+    const { handleListConversations } = await import('../src/tools/list-conversations.js');
+    handleStartConversation(db, { project_id: 'p', agent_id: 'a', title: 'C1' });
+    handleStartConversation(db, { project_id: 'p', agent_id: 'a', title: 'C2' });
+    const results = handleListConversations(db, { project_id: 'p' });
+    expect(results).toHaveLength(2);
+  });
+
+  it('filters by status', async () => {
+    const { handleStartConversation } = await import('../src/tools/start-conversation.js');
+    const { handleCloseConversation } = await import('../src/tools/close-conversation.js');
+    const { handleListConversations } = await import('../src/tools/list-conversations.js');
+    const { id } = handleStartConversation(db, { project_id: 'p', agent_id: 'a' });
+    handleStartConversation(db, { project_id: 'p', agent_id: 'a' });
+    await handleCloseConversation(db, { conversation_id: id, summary: 'done' });
+    const closed = handleListConversations(db, { project_id: 'p', status: 'closed' });
+    expect(closed).toHaveLength(1);
+    expect(closed[0].id).toBe(id);
+  });
+
+  it('returns empty array for unknown project', async () => {
+    const { handleListConversations } = await import('../src/tools/list-conversations.js');
+    expect(handleListConversations(db, { project_id: 'nobody' })).toHaveLength(0);
+  });
+});
+
+describe('delete_conversation tool', () => {
+  it('deletes a conversation and its turns', async () => {
+    const { handleStartConversation } = await import('../src/tools/start-conversation.js');
+    const { handleAppendTurn } = await import('../src/tools/append-turn.js');
+    const { handleDeleteConversation } = await import('../src/tools/delete-conversation.js');
+    const { id } = handleStartConversation(db, { project_id: 'p', agent_id: 'a' });
+    handleAppendTurn(db, { conversation_id: id, role: 'user', content: 'Q' });
+    const result = handleDeleteConversation(db, { conversation_id: id });
+    expect(result.deleted).toBe(true);
+    const row = db.prepare('SELECT id FROM conversations WHERE id = ?').get(id);
+    expect(row).toBeUndefined();
+    const turns = db.prepare('SELECT id FROM conversation_turns WHERE conversation_id = ?').all(id);
+    expect(turns).toHaveLength(0);
+  });
+
+  it('throws for unknown conversation_id', async () => {
+    const { handleDeleteConversation } = await import('../src/tools/delete-conversation.js');
+    expect(() => handleDeleteConversation(db, { conversation_id: 'does-not-exist' }))
+      .toThrow('Conversation not found');
+  });
+});
+
 describe('full conversation lifecycle', () => {
   it('start → append multiple turns → close → retrieve → search', async () => {
     const { handleStartConversation } = await import('../src/tools/start-conversation.js');

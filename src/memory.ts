@@ -268,3 +268,10 @@ export function upsertMemory(
 
   return insertMemory(db, { ...params, importance });
 }
+
+export function getMemory(
+  db: Database.Database,
+  id: string
+): Memory | null {
+  return (db.prepare('SELECT * FROM memories WHERE id = ?').get(id) as Memory | undefined) ?? null;
+}

@@ -222,6 +222,24 @@ describe('remember_memory deduplication (upsert)', () => {
   });
 });
 
+describe('get_memory tool', () => {
+  it('returns the memory for a known id', async () => {
+    const { handleRemember } = await import('../src/tools/remember.js');
+    const { handleGetMemory } = await import('../src/tools/get-memory.js');
+    const { id } = await handleRemember(db, { project_id: '/p', agent_id: 'a', type: 'fact', content: 'fetchable', importance: 0.6 });
+    const result = handleGetMemory(db, { id });
+    expect(result.found).toBe(true);
+    expect(result.memory?.content).toBe('fetchable');
+  });
+
+  it('returns { found: false } for an unknown id', async () => {
+    const { handleGetMemory } = await import('../src/tools/get-memory.js');
+    const result = handleGetMemory(db, { id: '00000000-0000-0000-0000-000000000000' });
+    expect(result.found).toBe(false);
+    expect(result.memory).toBeUndefined();
+  });
+});
+
 describe('list_memories tool', () => {
   it('lists all memories for a project', async () => {
     const { handleRemember } = await import('../src/tools/remember.js')

@@ -14,6 +14,9 @@ import { handleAppendTurn } from './tools/append-turn.js';
 import { handleCloseConversation } from './tools/close-conversation.js';
 import { handleGetConversation } from './tools/get-conversation.js';
 import { handleSearchConversations } from './tools/search-conversations.js';
+import { handleGetMemory } from './tools/get-memory.js';
+import { handleListConversations } from './tools/list-conversations.js';
+import { handleDeleteConversation } from './tools/delete-conversation.js';
 
 const MEMORY_TYPES = ['fact', 'code_pattern', 'preference', 'decision', 'task', 'observation'] as const;
 const TURN_ROLES = ['user', 'assistant', 'tool'] as const;
@@ -164,6 +167,56 @@ export function createServer(db: Database.Database): McpServer {
     (input) => {
       try {
         const result = handleDeleteProject(db, input);
+        return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { content: [{ type: 'text', text: msg }], isError: true };
+      }
+    }
+  );
+
+  server.tool(
+    'get_memory',
+    'Fetch a single memory by id',
+    { id: z.string().uuid() },
+    (input) => {
+      try {
+        const result = handleGetMemory(db, input);
+        return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { content: [{ type: 'text', text: msg }], isError: true };
+      }
+    }
+  );
+
+  server.tool(
+    'list_conversations',
+    'List conversations for a project without semantic search',
+    {
+      project_id: z.string().min(1),
+      agent_id: z.string().min(1).optional(),
+      status: z.enum(['open', 'closed']).optional(),
+      limit: z.number().int().min(1).max(200).optional(),
+    },
+    (input) => {
+      try {
+        const result = handleListConversations(db, input);
+        return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { content: [{ type: 'text', text: msg }], isError: true };
+      }
+    }
+  );
+
+  server.tool(
+    'delete_conversation',
+    'Permanently delete a conversation and all its turns',
+    { conversation_id: z.string().min(1) },
+    (input) => {
+      try {
+        const result = handleDeleteConversation(db, input);
         return { content: [{ type: 'text', text: JSON.stringify(result) }] };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
