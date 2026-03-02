@@ -7,6 +7,8 @@ const W_IMP    = parseFloat(process.env.ENGRAMDB_W_IMP    ?? '') || 0.25;
 const W_REC    = parseFloat(process.env.ENGRAMDB_W_REC    ?? '') || 0.15;
 const LAMBDA   = parseFloat(process.env.ENGRAMDB_DECAY_LAMBDA ?? '') || 0.01;
 
+const VALID_MEMORY_TYPES = new Set<string>(['fact', 'code_pattern', 'preference', 'decision', 'task', 'observation']);
+
 // Warn at startup if weights don't sum to ~1.0
 const W_SUM = W_SIM + W_IMP + W_REC;
 if (Math.abs(W_SUM - 1.0) > 0.01) {
@@ -141,6 +143,10 @@ export function updateMemory(
 ): { id: string; updated_at: number } | null {
   const existing = db.prepare('SELECT id FROM memories WHERE id = ?').get(id);
   if (!existing) return null;
+
+  if (fields.type !== undefined && !VALID_MEMORY_TYPES.has(fields.type)) {
+    throw new Error(`Invalid memory type: "${fields.type}". Valid types: ${[...VALID_MEMORY_TYPES].join(', ')}`);
+  }
 
   const now = Date.now();
   const sets: string[] = ['updated_at = ?'];

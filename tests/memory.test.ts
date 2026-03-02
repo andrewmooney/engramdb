@@ -164,6 +164,20 @@ describe('insertMemory importance clamp', () => {
   });
 });
 
+describe('updateMemory type validation', () => {
+  let db: Database.Database;
+  beforeEach(() => { db = createDb(':memory:'); });
+
+  it('throws for invalid type value', () => {
+    const { id } = insertMemory(db, {
+      project_id: '/p', agent_id: 'a', type: 'fact', content: 'x',
+      importance: 0.5, embedding: new Float32Array(768).fill(0.1),
+    });
+    expect(() => updateMemory(db, id, { type: 'invalid_type' as MemoryType }))
+      .toThrow('Invalid memory type');
+  });
+});
+
 describe('queryMemories access_count batched update', () => {
   let db: Database.Database;
   beforeEach(() => { db = createDb(':memory:'); });

@@ -50,7 +50,7 @@ export function createServer(db: Database.Database): McpServer {
       query: z.string().min(1),
       limit: z.number().int().min(1).max(50).optional(),
       type: z.enum(MEMORY_TYPES).optional(),
-      agent_id: z.string().optional(),
+      agent_id: z.string().min(1).optional(),
     },
     async (input) => {
       try {
@@ -250,7 +250,7 @@ export function createServer(db: Database.Database): McpServer {
     'Semantically search closed conversations by summary',
     {
       query: z.string().min(1),
-      project_id: z.string().optional(),
+      project_id: z.string().min(1).optional(),
       limit: z.number().int().min(1).max(50).optional(),
     },
     async (input) => {
