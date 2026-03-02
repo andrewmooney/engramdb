@@ -15,12 +15,14 @@ interface ClientDescriptor {
   report?: (log: (l: string) => void) => void
 }
 
-const OPENCODE_PLUGIN_SOURCE = `import type { Plugin } from "@opencode-ai/plugin"
+export const OPENCODE_PLUGIN_SOURCE = `import type { Plugin } from "@opencode-ai/plugin"
 import { $ } from "bun"
 import path from "path"
 
 const conversationMap = new Map<string, string>()
-const lastAppendedMap = new Map<string, string>()
+// Tracks the index (exclusive) of the last message we've already appended per session.
+// On session.idle we append all messages from this index onwards.
+const lastAppendedIndexMap = new Map<string, number>()
 let rpcId = 0
 
 async function callMtmem(toolName: string, args: Record<string, unknown>): Promise<unknown> {
@@ -63,15 +65,21 @@ export const EngramdbPlugin: Plugin = async ({ client, directory }) => {
           try {
             const messages = await client.session.messages({ path: { id: sessionID } })
             const all = messages.data ?? []
-            const lastAssistant = [...all].reverse().find((m) => m.info?.role === "assistant")
-            if (!lastAssistant) return
-            const msgId = lastAssistant.info?.id
-            if (msgId && lastAppendedMap.get(sessionID) === msgId) return
-            const content = (lastAssistant.parts ?? []).filter((p) => p.type === "text").map((p) => (p as { text?: string }).text ?? "").join("\\n").trim()
-            if (!content) return
-            await callMtmem("append_turn", { conversation_id: conversationId, role: "assistant", content })
-            if (msgId) lastAppendedMap.set(sessionID, msgId)
-            await client.app.log({ body: { service: "engramdb-plugin", level: "debug", message: "session.idle: turn appended", extra: { sessionID, msgId } } })
+            const startIdx = lastAppendedIndexMap.get(sessionID) ?? 0
+            const unsaved = all.slice(startIdx)
+            let appended = 0
+            for (const m of unsaved) {
+              const role = m.info?.role
+              if (role !== "user" && role !== "assistant") continue
+              const content = (m.parts ?? []).filter((p) => p.type === "text").map((p) => (p as { text?: string }).text ?? "").join("\\n").trim()
+              if (!content) continue
+              await callMtmem("append_turn", { conversation_id: conversationId, role, content })
+              appended++
+            }
+            if (appended > 0) {
+              lastAppendedIndexMap.set(sessionID, startIdx + unsaved.length)
+              await client.app.log({ body: { service: "engramdb-plugin", level: "debug", message: \`session.idle: \${appended} turn(s) appended\`, extra: { sessionID, appended } } })
+            }
           } catch (err) {
             await client.app.log({ body: { service: "engramdb-plugin", level: "warn", message: "session.idle: append_turn failed", extra: { error: String(err), sessionID } } })
           }
@@ -90,12 +98,12 @@ export const EngramdbPlugin: Plugin = async ({ client, directory }) => {
             }).join("\\n")
             await callMtmem("close_conversation", { conversation_id: conversationId, summary: summary || "Session ended." })
             conversationMap.delete(sessionId)
-            lastAppendedMap.delete(sessionId)
+            lastAppendedIndexMap.delete(sessionId)
             await client.app.log({ body: { service: "engramdb-plugin", level: "info", message: "session.deleted: conversation closed", extra: { sessionId, conversationId } } })
           } catch (err) {
             await client.app.log({ body: { service: "engramdb-plugin", level: "warn", message: "session.deleted: close_conversation failed", extra: { error: String(err), sessionId } } })
             conversationMap.delete(sessionId)
-            lastAppendedMap.delete(sessionId)
+            lastAppendedIndexMap.delete(sessionId)
           }
         } else if (event.type.startsWith("session.")) {
           await client.app.log({ body: { service: "engramdb-plugin", level: "debug", message: \`event: \${event.type}\`, extra: event.properties } })

@@ -223,6 +223,12 @@ it('VS Code Copilot: creates .github/copilot-instructions.md in cwd', async () =
   }
 })
 
+it('OPENCODE_PLUGIN_SOURCE uses index-based dedup (lastAppendedIndexMap)', async () => {
+  const { OPENCODE_PLUGIN_SOURCE } = await import('./setup.js')
+  expect(OPENCODE_PLUGIN_SOURCE).toContain('lastAppendedIndexMap')
+  expect(OPENCODE_PLUGIN_SOURCE).not.toContain('lastAppendedMap')
+})
+
 it('Claude Desktop: detected but no files written', async () => {
   const home = await mkdtemp(join(tmpdir(), 'engramdb-setup-test-'))
   const cwd = await mkdtemp(join(tmpdir(), 'engramdb-setup-cwd-'))
