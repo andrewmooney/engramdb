@@ -178,3 +178,20 @@ export function deleteMemory(
 
   return { deleted: true, id };
 }
+
+export function deleteProject(
+  db: Database.Database,
+  project_id: string
+): { project_id: string; deleted_count: number } {
+  const { count } = db.prepare('SELECT COUNT(*) as count FROM memories WHERE project_id = ?').get(project_id) as { count: number };
+
+  if (count === 0) return { project_id, deleted_count: 0 };
+
+  const doDelete = db.transaction(() => {
+    db.prepare('DELETE FROM memory_embeddings WHERE id IN (SELECT id FROM memories WHERE project_id = ?)').run(project_id);
+    db.prepare('DELETE FROM memories WHERE project_id = ?').run(project_id);
+  });
+  doDelete();
+
+  return { project_id, deleted_count: count };
+}

@@ -158,3 +158,37 @@ describe('delete_memory tool', () => {
     expect(row).toBeUndefined();
   });
 });
+
+describe('delete_project tool', () => {
+  it('deletes all memories for a project', async () => {
+    const { handleRemember } = await import('../src/tools/remember.js')
+    const { handleDeleteProject } = await import('../src/tools/delete-project.js')
+    const { handleListProjects } = await import('../src/tools/list-projects.js')
+    const { id: id1 } = await handleRemember(db, { project_id: '/proj', agent_id: 'a', type: 'fact', content: 'mem1', importance: 0.5 })
+    const { id: id2 } = await handleRemember(db, { project_id: '/proj', agent_id: 'a', type: 'fact', content: 'mem2', importance: 0.5 })
+    const result = handleDeleteProject(db, { project_id: '/proj' })
+    expect(result.deleted_count).toBe(2)
+    const projects = handleListProjects(db)
+    expect(projects).toHaveLength(0)
+    const embRows = db.prepare('SELECT id FROM memory_embeddings WHERE id IN (?, ?)').all(id1, id2)
+    expect(embRows).toHaveLength(0)
+  })
+
+  it('returns 0 deleted_count for unknown project', async () => {
+    const { handleDeleteProject } = await import('../src/tools/delete-project.js')
+    const result = handleDeleteProject(db, { project_id: '/nonexistent' })
+    expect(result.deleted_count).toBe(0)
+  })
+
+  it('only deletes memories for specified project', async () => {
+    const { handleRemember } = await import('../src/tools/remember.js')
+    const { handleDeleteProject } = await import('../src/tools/delete-project.js')
+    const { handleListProjects } = await import('../src/tools/list-projects.js')
+    await handleRemember(db, { project_id: '/projA', agent_id: 'a', type: 'fact', content: 'mem A', importance: 0.5 })
+    await handleRemember(db, { project_id: '/projB', agent_id: 'a', type: 'fact', content: 'mem B', importance: 0.5 })
+    handleDeleteProject(db, { project_id: '/projA' })
+    const projects = handleListProjects(db)
+    expect(projects).toHaveLength(1)
+    expect(projects[0].project_id).toBe('/projB')
+  })
+})
