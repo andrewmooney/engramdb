@@ -348,7 +348,12 @@ export function createServer(db: Database.Database): McpServer {
     'Get the currently running version of engramdb',
     {},
     () => {
-      return { content: [{ type: 'text', text: JSON.stringify({ version: VERSION }) }] };
+      try {
+        return { content: [{ type: 'text', text: JSON.stringify({ version: VERSION }) }] };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { content: [{ type: 'text', text: msg }], isError: true };
+      }
     }
   );
 
