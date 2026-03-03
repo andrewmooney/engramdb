@@ -1,18 +1,22 @@
-import { homedir } from 'node:os'
-import { join } from 'node:path'
-import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 
 export interface SetupOptions {
-  homeDir?: string
-  cwd?: string
-  log?: (line: string) => void
+  homeDir?: string;
+  cwd?: string;
+  log?: (line: string) => void;
 }
 
 interface ClientDescriptor {
-  label: string
-  detectionPath: (home: string) => string
-  setup?: (home: string, cwd: string, log: (l: string) => void) => Promise<void>
-  report?: (log: (l: string) => void) => void
+  label: string;
+  detectionPath: (home: string) => string;
+  setup?: (
+    home: string,
+    cwd: string,
+    log: (l: string) => void,
+  ) => Promise<void>;
+  report?: (log: (l: string) => void) => void;
 }
 
 export const OPENCODE_PLUGIN_SOURCE = `import type { Plugin } from "@opencode-ai/plugin"
@@ -138,72 +142,118 @@ export const EngramdbPlugin: Plugin = async ({ client, directory }) => {
     },
   }
 }
-`
+`;
 
-async function setupOpenCode(home: string, log: (l: string) => void): Promise<void> {
-  const baseDir = join(home, '.config', 'opencode')
-  const pluginsDir = join(baseDir, 'plugins')
+async function setupOpenCode(
+  home: string,
+  log: (l: string) => void,
+): Promise<void> {
+  const baseDir = join(home, ".config", "opencode");
+  const pluginsDir = join(baseDir, "plugins");
 
   // 1. Write plugin
-  await mkdir(pluginsDir, { recursive: true })
-  await writeFile(join(pluginsDir, 'engramdb.ts'), OPENCODE_PLUGIN_SOURCE)
+  await mkdir(pluginsDir, { recursive: true });
+  await writeFile(join(pluginsDir, "engramdb.ts"), OPENCODE_PLUGIN_SOURCE);
 
   // 2. Patch package.json
-  const pkgPath = join(baseDir, 'package.json')
-  let pkg: Record<string, unknown> = {}
+  const pkgPath = join(baseDir, "package.json");
+  let pkg: Record<string, unknown> = {};
   try {
-    pkg = JSON.parse(await readFile(pkgPath, 'utf8'))
-  } catch { /* create fresh */ }
-  const deps = (pkg['dependencies'] as Record<string, string> | undefined) ?? {}
-  deps['@opencode-ai/plugin'] = 'latest'
-  pkg['dependencies'] = deps
-  await writeFile(pkgPath, JSON.stringify(pkg, null, 2) + '\n')
+    pkg = JSON.parse(await readFile(pkgPath, "utf8"));
+  } catch {
+    /* create fresh */
+  }
+  const deps =
+    (pkg["dependencies"] as Record<string, string> | undefined) ?? {};
+  deps["@opencode-ai/plugin"] = "latest";
+  pkg["dependencies"] = deps;
+  await writeFile(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
 
   // 3. Append AGENTS.md
-  await appendAgentsMd(join(baseDir, 'AGENTS.md'))
+  await appendAgentsMd(join(baseDir, "AGENTS.md"));
 
-  log('  ✓ OpenCode        plugin installed, AGENTS.md updated')}
-
-async function setupClaudeCode(home: string, log: (l: string) => void): Promise<void> {
-  await appendAgentsMd(join(home, '.claude', 'CLAUDE.md'))
-  log('  ✓ Claude Code     CLAUDE.md updated')
+  log("  ✓ OpenCode        plugin installed, AGENTS.md updated");
 }
 
-async function setupCursor(home: string, log: (l: string) => void): Promise<void> {
-  const rulesDir = join(home, '.cursor', 'rules')
-  await mkdir(rulesDir, { recursive: true })
-  await writeFile(join(rulesDir, 'engramdb.md'), AGENTS_MD_SECTION.trim())
-  log('  ✓ Cursor          rules file written (~/.cursor/rules/engramdb.md)')
+async function setupClaudeCode(
+  home: string,
+  log: (l: string) => void,
+): Promise<void> {
+  await appendAgentsMd(join(home, ".claude", "CLAUDE.md"));
+  log("  ✓ Claude Code     CLAUDE.md updated");
 }
 
-async function setupVSCode(_home: string, cwd: string, log: (l: string) => void): Promise<void> {
-  const githubDir = join(cwd, '.github')
-  await mkdir(githubDir, { recursive: true })
-  await appendAgentsMd(join(githubDir, 'copilot-instructions.md'))
-  log('  ✓ VS Code Copilot .github/copilot-instructions.md updated')
+async function setupCursor(
+  home: string,
+  log: (l: string) => void,
+): Promise<void> {
+  const rulesDir = join(home, ".cursor", "rules");
+  await mkdir(rulesDir, { recursive: true });
+  await writeFile(join(rulesDir, "engramdb.md"), AGENTS_MD_SECTION.trim());
+  log("  ✓ Cursor          rules file written (~/.cursor/rules/engramdb.md)");
+}
+
+async function setupVSCode(
+  _home: string,
+  cwd: string,
+  log: (l: string) => void,
+): Promise<void> {
+  const githubDir = join(cwd, ".github");
+  await mkdir(githubDir, { recursive: true });
+  await appendAgentsMd(join(githubDir, "copilot-instructions.md"));
+  log("  ✓ VS Code Copilot .github/copilot-instructions.md updated");
 }
 
 function reportClaudeDesktop(log: (l: string) => void): void {
-  log('  - Claude Desktop  detected — no instruction file path (configure manually via Claude Projects)')
+  log(
+    "  - Claude Desktop  detected — no instruction file path (configure manually via Claude Projects)",
+  );
 }
 
 const CLIENTS: ClientDescriptor[] = [
-  { label: 'OpenCode',        detectionPath: (h) => join(h, '.config', 'opencode'), setup: (h, _c, l) => setupOpenCode(h, l) },
-  { label: 'Claude Code',     detectionPath: (h) => join(h, '.claude'),             setup: (h, _c, l) => setupClaudeCode(h, l) },
-  { label: 'Cursor',          detectionPath: (h) => join(h, '.cursor'),             setup: (h, _c, l) => setupCursor(h, l) },
-  { label: 'VS Code Copilot', detectionPath: (h) => join(h, '.vscode'),             setup: (h, c, l) => setupVSCode(h, c, l) },
-  { label: 'Claude Desktop',  detectionPath: (h) =>
-      process.platform === 'win32'
-        ? join(process.env['APPDATA'] ?? join(h, 'AppData', 'Roaming'), 'Claude')
-        : join(h, 'Library', 'Application Support', 'Claude'),
-    report: reportClaudeDesktop },
-]
+  {
+    label: "OpenCode",
+    detectionPath: (h) => join(h, ".config", "opencode"),
+    setup: (h, _c, l) => setupOpenCode(h, l),
+  },
+  {
+    label: "Claude Code",
+    detectionPath: (h) => join(h, ".claude"),
+    setup: (h, _c, l) => setupClaudeCode(h, l),
+  },
+  {
+    label: "Cursor",
+    detectionPath: (h) => join(h, ".cursor"),
+    setup: (h, _c, l) => setupCursor(h, l),
+  },
+  {
+    label: "VS Code Copilot",
+    detectionPath: (h) => join(h, ".vscode"),
+    setup: (h, c, l) => setupVSCode(h, c, l),
+  },
+  {
+    label: "Claude Desktop",
+    detectionPath: (h) =>
+      process.platform === "win32"
+        ? join(
+            process.env["APPDATA"] ?? join(h, "AppData", "Roaming"),
+            "Claude",
+          )
+        : join(h, "Library", "Application Support", "Claude"),
+    report: reportClaudeDesktop,
+  },
+];
 
 export async function pathExists(p: string): Promise<boolean> {
-  try { await access(p); return true } catch { return false }
+  try {
+    await access(p);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-const AGENTS_SENTINEL = '## Memory (engramdb)'
+const AGENTS_SENTINEL = "## Memory (engramdb)";
 
 const AGENTS_MD_SECTION = `
 ## Memory (engramdb)
@@ -212,7 +262,37 @@ You have persistent memory via the \`engramdb\` MCP server. A plugin handles the
 automatically (opening/closing conversations, loading prior context at session start).
 Your job is to make judgment calls about what's worth storing.
 
-### When to call \`remember_memory\`
+### Available tools
+
+| Tool | Purpose |
+|------|---------|
+| \`engramdb_remember_memory\` | Store a single memory |
+| \`engramdb_remember_many\` | Bulk-store up to 50 memories in one call |
+| \`engramdb_recall_memories\` | Semantic search for memories within a project |
+| \`engramdb_list_memories\` | List all memories for a project (no semantic search) |
+| \`engramdb_get_memory\` | Fetch a single memory by UUID |
+| \`engramdb_update_memory\` | Update content/importance/type of an existing memory |
+| \`engramdb_delete_memory\` | Delete a memory by UUID |
+| \`engramdb_list_projects\` | List all projects with memory counts |
+| \`engramdb_delete_project\` | Delete all memories for a project |
+| \`engramdb_start_conversation\` | Start a new conversation session |
+| \`engramdb_append_turn\` | Append a turn to an open conversation |
+| \`engramdb_close_conversation\` | Close a conversation and store a searchable summary |
+| \`engramdb_get_conversation\` | Retrieve a conversation and all its turns |
+| \`engramdb_list_conversations\` | List conversations for a project |
+| \`engramdb_delete_conversation\` | Permanently delete a conversation and all its turns |
+| \`engramdb_search_conversations\` | Semantically search closed conversations by summary |
+| \`engramdb_search_global\` | Search memories across all projects |
+| \`engramdb_get_version\` | Get the running engramdb version |
+
+### Key parameters
+
+- **\`project_id\`** — required on most calls; identifies which project the memory belongs to. Use the repository name or a stable identifier for the current project.
+- **\`agent_id\`** — required on most calls; identifies the agent storing the memory. Use a consistent identifier (e.g. \`"copilot"\`).
+- **\`id\`** — UUID of a specific memory, used with \`get\`, \`update\`, and \`delete\` operations.
+- **\`conversation_id\`** — identifier returned by \`start_conversation\`, used for subsequent \`append_turn\`, \`close_conversation\`, and \`get_conversation\` calls.
+
+### When to call \`engramdb_remember_memory\`
 
 Call it when you learn something worth carrying into future sessions:
 - Architectural decisions ("We use WAL mode for SQLite in this project")
@@ -240,58 +320,68 @@ Do NOT store: transient state, things already visible in the codebase, things th
 | \`code_pattern\` | Recurring code patterns or conventions |
 | \`fact\` | General facts about the project |
 | \`observation\` | Things you noticed that may be useful later |
+| \`task\` | Ongoing or planned work items |
 
-### When to call \`append_turn\` manually
+### When to call \`engramdb_append_turn\` manually
 
-The plugin appends assistant turns automatically. Call \`append_turn(role="user", ...)\`
+The plugin appends assistant turns automatically. Call \`engramdb_append_turn(role="user", ...)\`
 manually if the user's message contains an important decision or constraint that you want
 preserved in the conversation log.
-`
+
+### Conversation lifecycle
+
+1. **Start** — \`engramdb_start_conversation\` returns a \`conversation_id\`.
+2. **Append** — \`engramdb_append_turn\` with \`role\` = \`"user"\`, \`"assistant"\`, or \`"tool"\`.
+3. **Close** — \`engramdb_close_conversation\` with a concise \`summary\` (used for future semantic search).
+4. **Search** — \`engramdb_search_conversations\` finds past sessions by summary content.
+`;
 
 export async function appendAgentsMd(filePath: string): Promise<void> {
-  let existing = ''
+  let existing = "";
   try {
-    existing = await readFile(filePath, 'utf8')
+    existing = await readFile(filePath, "utf8");
   } catch {
     // file does not exist — create it
   }
-  if (existing.includes(AGENTS_SENTINEL)) return
-  const separator = existing.length > 0 && !existing.endsWith('\n') ? '\n' : ''
-  await writeFile(filePath, existing + separator + AGENTS_MD_SECTION)
+  if (existing.includes(AGENTS_SENTINEL)) return;
+  const separator = existing.length > 0 && !existing.endsWith("\n") ? "\n" : "";
+  await writeFile(filePath, existing + separator + AGENTS_MD_SECTION);
 }
 
 export async function runSetup(opts?: SetupOptions): Promise<void> {
-  const home = opts?.homeDir ?? homedir()
-  const cwd = opts?.cwd ?? process.cwd()
-  const log = opts?.log ?? console.log
+  const home = opts?.homeDir ?? homedir();
+  const cwd = opts?.cwd ?? process.cwd();
+  const log = opts?.log ?? console.log;
 
-  log('\nengramdb setup\n')
+  log("\nengramdb setup\n");
 
-  const detected: ClientDescriptor[] = []
+  const detected: ClientDescriptor[] = [];
   for (const client of CLIENTS) {
     if (await pathExists(client.detectionPath(home))) {
-      detected.push(client)
+      detected.push(client);
     }
   }
 
-  log('Detected clients:')
+  log("Detected clients:");
   if (detected.length === 0) {
-    log('  (no clients detected)\n')
-    log('Install an AI client (OpenCode, Claude Code, Cursor, or VS Code with Copilot) and re-run setup.')
-    return
+    log("  (no clients detected)\n");
+    log(
+      "Install an AI client (OpenCode, Claude Code, Cursor, or VS Code with Copilot) and re-run setup.",
+    );
+    return;
   }
 
   for (const client of detected) {
     try {
       if (client.setup) {
-        await client.setup(home, cwd, log)
+        await client.setup(home, cwd, log);
       } else if (client.report) {
-        client.report(log)
+        client.report(log);
       }
     } catch (err) {
-      log(`  ✗ ${client.label.padEnd(16)} failed: ${String(err)}`)
+      log(`  ✗ ${client.label.padEnd(16)} failed: ${String(err)}`);
     }
   }
 
-  log('\nSetup complete. Restart your AI client to load the changes.')
+  log("\nSetup complete. Restart your AI client to load the changes.");
 }
