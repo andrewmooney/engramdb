@@ -21,6 +21,31 @@ npm run test:watch   # Run tests in watch mode
 
 > The first run downloads the ~270 MB `nomic-embed-text-v1` model. This is expected.
 
+## CLI Usage
+
+```bash
+engramdb              # Start MCP server (default: stdio transport)
+engramdb setup        # Auto-configure detected AI clients
+engramdb --version    # Print version and exit
+engramdb -v           # Same as --version
+```
+
+**Transport selection** (via `MCP_TRANSPORT` env var):
+- `stdio` (default) — communicates over stdin/stdout; used by most MCP clients
+- `http` — starts an Express HTTP/SSE server on `MCP_PORT` (default 3456)
+
+**`engramdb setup`** detects installed AI clients and writes the appropriate config files:
+
+| Client | Detection path | Files written |
+|--------|---------------|---------------|
+| OpenCode | `~/.config/opencode/` | `plugins/engramdb.ts` + `AGENTS.md` update |
+| Claude Code | `~/.claude/` | `CLAUDE.md` update |
+| Cursor | `~/.cursor/` | `.cursor/rules/engramdb.md` |
+| VS Code Copilot | `~/.vscode/` | `.github/copilot-instructions.md` update |
+| Claude Desktop | detected only | prints manual config reminder |
+
+The setup command is idempotent — it checks for the sentinel `## Memory (engramdb)` before appending and skips if already present.
+
 ## Repository Structure
 
 ```
@@ -49,6 +74,9 @@ tests/                # Vitest test suites
   conversation-tools.test.ts
 src/
   conversation.test.ts, setup.test.ts
+
+scripts/
+  migrate-embeddings.ts  # One-off script to re-embed all existing memories
 
 docs/plans/           # Design documents for past/future features
 .github/
@@ -105,37 +133,50 @@ Similarity conversion from L2 distance: `similarity = 1 - (distance² / 2)`
 
 Oversampling: vector search fetches `limit × 5` candidates (when filters active) or `limit × 2` before re-scoring and slicing.
 
+**Access tracking**: every `queryMemories` call batch-updates `last_accessed_at` and increments `access_count` for the returned memories. This feeds the recency signal in subsequent retrievals.
+
 ### MCP Tools (18 total)
 
 **Memory tools:**
-| Tool | Function |
-|------|----------|
-| `remember_memory` | Upsert a memory (deduplicates by project_id + content) |
-| `remember_many` | Batch insert/upsert multiple memories |
-| `recall_memories` | Semantic search within a project |
-| `search_global` | Semantic search across all projects |
-| `update_memory` | Update content, importance, or type |
-| `delete_memory` | Delete a single memory by id |
-| `delete_project` | Delete all memories for a project |
-| `list_projects` | List all project_ids with memory counts |
-| `list_memories` | List memories for a project (no vector search) |
-| `get_memory` | Fetch a single memory by id |
+| Tool | Key parameters | Notes |
+|------|---------------|-------|
+| `remember_memory` | `project_id`, `agent_id`, `type`, `content`, `importance?` | Upserts on exact `(project_id, content)` match |
+| `remember_many` | `project_id`, `agent_id`, `memories[]` | Batch upsert; max 50 items per call |
+| `recall_memories` | `project_id`, `query`, `limit?`, `type?`, `agent_id?` | Semantic search; limit 1–50 |
+| `search_global` | `query`, `limit?` | Searches memories only (not conversations); limit 1–50 |
+| `update_memory` | `id` (UUID), `content?`, `importance?`, `type?` | At least one of content/importance/type required |
+| `delete_memory` | `id` (UUID) | Throws if not found |
+| `delete_project` | `project_id` | Deletes all memories for that project |
+| `list_projects` | — | Returns project_id, memory_count, last_updated_at |
+| `list_memories` | `project_id`, `type?`, `agent_id?`, `limit?` | No vector search; ordered by updated_at DESC; limit up to 500 |
+| `get_memory` | `id` (UUID) | Returns null if not found |
 
 **Conversation tools:**
-| Tool | Function |
-|------|----------|
-| `start_conversation` | Create a new open conversation |
-| `append_turn` | Add a turn (role + content) to an open conversation |
-| `close_conversation` | Finalize, embed the summary, mark closed |
-| `get_conversation` | Fetch conversation + all turns |
-| `list_conversations` | List conversations for a project |
-| `delete_conversation` | Delete a conversation and its turns |
-| `search_conversations` | Semantic search of closed conversation summaries |
+| Tool | Key parameters | Notes |
+|------|---------------|-------|
+| `start_conversation` | `project_id`, `agent_id`, `title?` | Returns `conversation_id` |
+| `append_turn` | `conversation_id`, `role`, `content` | Role: `user \| assistant \| tool`; conversation must be open |
+| `close_conversation` | `conversation_id`, `summary` | Embeds summary for future semantic search; marks status `closed` |
+| `get_conversation` | `conversation_id` | Returns conversation metadata + all turns |
+| `list_conversations` | `project_id`, `agent_id?`, `status?`, `limit?` | Status filter: `open \| closed`; limit up to 200 |
+| `delete_conversation` | `conversation_id` | Deletes conversation, all turns, and embedding |
+| `search_conversations` | `query`, `project_id?`, `limit?` | Only searches closed conversations; limit 1–50 |
 
 **Utility:**
-| Tool | Function |
-|------|----------|
-| `get_version` | Return the current package version |
+| Tool | Notes |
+|------|-------|
+| `get_version` | Returns `{ version: "x.y.z" }` |
+
+### Conversation Lifecycle
+
+```
+start_conversation → append_turn (×N) → close_conversation → search_conversations
+```
+
+1. `start_conversation` — returns `conversation_id`; conversation status is `open`
+2. `append_turn` — add turns with role `user`, `assistant`, or `tool`; can only append to open conversations
+3. `close_conversation` — provide a summary string; it gets embedded and the conversation becomes `closed`
+4. `search_conversations` — semantic search over closed conversation summaries; open conversations are excluded
 
 ## Code Conventions
 
